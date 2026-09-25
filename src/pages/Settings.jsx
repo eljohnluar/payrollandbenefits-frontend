@@ -1,0 +1,162 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthContext.jsx';
+import { useResource } from '../hooks/useResource.js';
+import { api } from '../api/client.js';
+import { PageHeader, Card, Field, Loading, ErrorBox, Notice } from '../components/ui.jsx';
+import pkg from '../../package.json';
+
+const APP_VERSION = pkg.version;
+
+export default function Settings() {
+  const { user } = useAuth();
+  const { data, loading, error, reload } = useResource('/api/settings');
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState({ kind: 'info', msg: '' });
+
+  const canEdit = user?.role === 'Admin';
+
+  useEffect(() => {
+    if (data && typeof data === 'object') setForm({ ...data });
+  }, [data]);
+
+  function set(key, value) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function save() {
+    setSaving(true); setNotice({ kind: 'info', msg: '' });
+    try {
+      const res = await api.put('/api/settings', form);
+      setForm({ ...res });
+      setNotice({ kind: 'success', msg: 'Settings saved.' });
+    } catch (e) {
+      setNotice({ kind: 'error', msg: e.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function reset() {
+    setNotice({ kind: 'info', msg: '' });
+    reload();
+  }
+
+  if (loading) return <Loading />;
+  if (error) return <ErrorBox error={error} />;
+
+  const hint = { fontSize: 11, color: 'var(--text-muted)', marginTop: 4 };
+  const input = (key, type, props = {}) => (
+    <input
+      className="form-control"
+      type={type}
+      value={form[key] ?? ''}
+      disabled={!canEdit}
+      onChange={(e) => set(key, e.target.value)}
+      {...props}
+    />
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="System Settings"
+        subtitle="Company profile, localization, and payroll configuration applied across the system"
+      />
+      <Notice kind={notice.kind}>{notice.msg}</Notice>
+
+      {!canEdit && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div
+            className="card-body"
+            style={{
+              border: '1px solid var(--warning)',
+              background: 'var(--warning-bg)',
+              color: 'var(--warning)',
+              fontSize: 13,
+              borderRadius: 'var(--radius)',
+              padding: '12px 14px',
+            }}
+          >
+            You need the Admin role to change settings. You are viewing them read-only.
+          </div>
+        </div>
+      )}
+
+      <div className="grid-2" style={{ alignItems: 'start' }}>
+        <Card title="Company & Localization" body>
+          <div className="form-group" style={{ marginBottom: 12 }}>
+            <Field label="Company Name">{input('company_name', 'text', { maxLength: 120, required: true })}</Field>
+            <div style={hint}>Shown on payslips and reports.</div>
+          </div>
+          <div className="form-grid-2" style={{ marginBottom: 0 }}>
+            <Field label="Currency Symbol">{input('currency_symbol', 'text', { maxLength: 5, required: true })}</Field>
+            <Field label="Currency Decimals">{input('currency_decimals', 'number', { min: 0, max: 2, step: 1, required: true })}</Field>
+          </div>
+        </Card>
+
+        <Card title="Payroll Defaults" body>
+          <div className="form-grid-2" style={{ marginBottom: 0 }}>
+            <div>
+              <Field label="Work Days per Month">{input('work_days_per_month', 'number', { min: 1, max: 31, step: 1, required: true })}</Field>
+              <div style={hint}>Used to prorate basic pay and unpaid leave deductions.</div>
+            </div>
+            <div>
+              <Field label="Work Hours per Day">{input('work_hours_per_day', 'number', { min: 1, max: 24, step: 1, required: true })}</Field>
+              <div style={hint}>Used to compute the hourly rate for overtime, night differential, and holiday pay.</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Statutory Contributions" body>
+          <div className="form-grid-2">
+            <div>
+              <Field label="PhilHealth Rate (%)">{input('philhealth_rate', 'number', { min: 0, max: 10, step: 0.1, required: true })}</Field>
+              <div style={hint}>Employee and employer each pay this percentage of the monthly salary (capped at ₱100,000 salary).</div>
+            </div>
+            <div>
+              <Field label="SSS Employee Share (top bracket)">{input('sss_ee_fixed', 'number', { min: 0, step: 1, required: true })}</Field>
+              <div style={hint}>Lower salary brackets pay 25%, 50%, and 75% of this amount.</div>
+            </div>
+            <Field label="SSS Employer Rate (%)">{input('sss_er_rate', 'number', { min: 0, max: 20, step: 0.1, required: true })}</Field>
+            <div>
+              <Field label="SSS Employer Cap">{input('sss_er_cap', 'number', { min: 0, step: 1, required: true })}</Field>
+              <div style={hint}>Maximum employer share for salaries of ₱20,000 and above. Lower brackets pay 25%, 50%, and 75% of this cap.</div>
+            </div>
+            <Field label="Pag-IBIG Employee (salary < 5,000)">{input('pagibig_ee_min', 'number', { min: 0, step: 1, required: true })}</Field>
+            <Field label="Pag-IBIG Employee (salary ≥ 5,000)">{input('pagibig_ee_max', 'number', { min: 0, step: 1, required: true })}</Field>
+            <Field label="Pag-IBIG Employer Share">{input('pagibig_er', 'number', { min: 0, step: 1, required: true })}</Field>
+          </div>
+        </Card>
+
+        <Card title="About" body>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            Changes take effect immediately and apply to the next payroll recompute — statutory shares,
+            proration factors, currency display, and the company name in the header.
+            <div style={{ height: 14 }} />
+            {[
+              ['Application:', 'Payroll & Benefits System'],
+              ['Version:', APP_VERSION],
+              ['Environment:', import.meta.env.MODE],
+              ['Backend:', 'PHP REST API'],
+              ['Database:', 'PostgreSQL (Supabase)'],
+            ].map(([label, val]) => (
+              <div key={label}>
+                <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{label}</span> {val}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {canEdit && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+          <button className="btn btn-secondary" onClick={reset} disabled={saving}>Reset</button>
+        </div>
+      )}
+    </>
+  );
+}
