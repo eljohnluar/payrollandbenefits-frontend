@@ -184,7 +184,7 @@ const TABS = [
 
 export default function Attendance() {
   const [tab, setTab] = useState('daily');
-  const [date, setDate] = useState(isoToday());
+  const [date, setDate] = useState('2026-09-26'); // demo default: last fully seeded attendance day
   const [month, setMonth] = useState(isoMonth());
   const [year, setYear] = useState(String(new Date().getFullYear()));
 

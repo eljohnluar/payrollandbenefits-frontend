@@ -4,6 +4,7 @@ import { api } from '../api/client.js';
 import { money } from '../lib/format.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useRealtime } from '../hooks/useRealtime.js';
+import { useResource } from '../hooks/useResource.js';
 import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Loading } from '../components/ui.jsx';
 
 const shortDate = (v) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
@@ -100,6 +101,7 @@ function activityText(details) {
 export default function Dashboard() {
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
+  const { data: inc } = useResource('/api/incentives/summary');
   const [error, setError] = useState('');
   const [busyRun, setBusyRun] = useState(null);
 
@@ -275,8 +277,55 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {inc && (inc.by_type?.length > 0 || Number(inc.totals?.total) > 0) && (
+            <div className="grid-2">
+              <Card title="Incentives Overview" right={<Link to="/compensation" className="btn btn-secondary btn-sm">Manage</Link>} body>
+                <div className="grid-2" style={{ marginBottom: 16 }}>
+                  <div style={{ padding: 16, background: 'var(--surface-alt)', borderRadius: 'var(--radius)' }}>
+                    <div className="stat-label">Total Incentives</div>
+                    <div className="stat-value" style={{ color: 'var(--success)' }}>{money(inc.totals?.total)}</div>
+                  </div>
+                  <div style={{ padding: 16, background: 'var(--surface-alt)', borderRadius: 'var(--radius)' }}>
+                    <div className="stat-label">Awaiting Payroll</div>
+                    <div className="stat-value" style={{ color: 'var(--warning)' }}>{money(inc.totals?.pending)}</div>
+                  </div>
+                </div>
+                {inc.by_type?.slice(0, 4).map((t) => (
+                  <div key={t.type} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{t.type}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{money(t.total)}</span>
+                    </div>
+                    <div className="progress-bar-track">
+                      <div className="progress-bar-fill" style={{ width: `${(Number(t.total) / Math.max(...inc.by_type.map((x) => Number(x.total)), 1)) * 100}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </Card>
+              <Card title="Top Incentive Earners" body>
+                <table style={{ width: '100%', fontSize: 13 }}>
+                  <thead>
+                    <tr><th>Employee</th><th style={{ textAlign: 'right' }}>YTD Incentives</th></tr>
+                  </thead>
+                  <tbody>
+                    {(inc.top_earners || []).map((t) => (
+                      <tr key={t.employee_id}>
+                        <td style={{ fontWeight: 600 }}>{t.name}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 600 }}>{money(t.total)}</td>
+                      </tr>
+                    ))}
+                    {!inc.top_earners?.length && <tr><td colSpan={2} style={{ color: 'var(--text-muted)' }}>No incentives recorded yet.</td></tr>}
+                  </tbody>
+                </table>
+                <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                  Monthly trend: {(inc.monthly_trend || []).slice(0, 3).map((m) => `${m.period} ${money(m.total)}`).join('  ·  ') || '—'}
+                </div>
+              </Card>
+            </div>
+          )}
+
           <div className="grid-2">
-            <Card title="Recent Payroll Items" right={<Link to="/payslips-viewer" className="btn btn-secondary btn-sm">Payslips Viewer</Link>}>
+            <Card title="Recent Payroll Items" right={<Link to="/payslips" className="btn btn-secondary btn-sm">Payslips</Link>}>
               <DataTable
                 columns={[
                   { key: 'employee_name', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.employee_name}</span> },

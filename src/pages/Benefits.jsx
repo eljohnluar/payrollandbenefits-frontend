@@ -164,8 +164,7 @@ export default function Benefits() {
     ) },
   ];
 
-  // Company policy (mirrored by the backend): Regular employees only, complete
-  // attendance in the trailing 30 days; absences block enrollment.
+  // Company policy (mirrored by the backend): Regular employees only.
   const enrollable = (employees || []).filter(
     (e) => (e.status === 'Active' || e.status === 'On Leave') && e.employment_type === 'Regular'
   );
@@ -181,7 +180,7 @@ export default function Benefits() {
       <div className="info-banner">
         <span>ℹ</span>
         <span>
-          Benefits are limited to <strong>Regular employees with complete attendance</strong> (no absences in the last 30 days).
+          Benefits are limited to <strong>Regular employees</strong>.
           Every employee is granted a mandatory <strong>Service Incentive Leave (15 days)</strong> that may only be used during <strong>April</strong>.
         </span>
       </div>

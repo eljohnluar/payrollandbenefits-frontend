@@ -281,6 +281,18 @@ employee's `ewallet_provider` / `ewallet_account` on `employees`.
 ### 6.4 Compensation Management
 - `compensation` — per-employee basic salary, effective-dated `salary_history`, active
   `allowances`, `loans` with monthly totals.
+- **Incentives** — `incentive_structures` (8 types: Performance, Sales, Attendance,
+  Productivity, Referral, Retention, Spot, Team; Fixed/Percentage rate; Monthly/Quarterly/
+  Annual/One-Time frequency; optional target & eligibility) produce `incentive_earnings`
+  per `YYYY-MM` period. Performance/Attendance/Retention auto-evaluate from
+  `performance_ratings` / `attendance_logs` / `hire_date` via
+  `POST /api/incentives/compute`; Sales/Productivity/Referral/Spot/Team are recorded from
+  HR-entered actuals via `POST /api/incentives/metric` (Team splits the pot across the
+  department). Earned amounts are claimed by the payroll run into
+  `payroll_items.incentives`, included in gross (so withholding and SSS/PhilHealth/Pag-IBIG
+  recompute), shown as a separate Earnings line on the payslip, marked Paid on
+  disbursement, and released back on return-to-draft. Analytics via
+  `GET /api/incentives/summary` (totals, by type/department, top earners, monthly trend).
 - `tax` — projects SSS/PhilHealth/Pag-IBIG (EE & ER) and withholding tax per active employee
   using the same `compute*` helpers.
 - `thirteenth_month` — annual pro-rated 13th-month computation with
@@ -371,3 +383,59 @@ actions; there is no standalone approvals queue page.
     remember to gate itself.
 - **Module gaps vs. the target suite:** Recruitment, Learning/Succession, and Collections
   are stubs or absent; several HRMS tables hold sample-seeded data only.
+
+---
+
+## 10. Integration Readiness (implemented in the PHP JSON API)
+
+The Payroll & Benefits module connects to the other suite modules through a dedicated
+integration layer, so external systems can push data in and pull results out without
+touching the human UI.
+
+### 10.1 Machine-to-machine auth
+- `integration_keys` table stores only the **SHA-256 hash** of each key; callers send the
+  plaintext in an `X-Api-Key` header.
+- Keys carry **scopes** (`core-hr:write`, `workforce:write`, `performance:write`,
+  `finance:read`, or `*`); every integration route checks its scope
+  (`src/IntegrationAuth.php`).
+- Issuance: Admin-only REST (`POST /api/integration/keys`, plaintext shown once) or
+  `scripts/create-integration-key.php` CLI. Revocation flips `is_active`; `last_used_at`
+  gives per-key activity visibility. A dev/demo key (`demo-core-hr`) is seeded by
+  migration `005_integration.sql`.
+
+### 10.2 Inbound contracts (this system consumes)
+| Source module | Endpoint | Payload | Conflict handling |
+|---|---|---|---|
+| Core HR | `POST /api/integration/employees` | `{employees:[{code, first_name, last_name, …}]}` | upsert by unique `code`; new rows get id `hris-<code>` |
+| Workforce Management | `POST /api/integration/attendance` | `{logs:[{employee_id, log_date, status, actual_hours, ot_hours, nd_hours, holiday_hours, late_minutes}]}` | upsert on `(employee_id, log_date)` |
+| Workforce Management | `POST /api/integration/leave` | `{requests:[{employee_id, leave_type, start_date, end_date, days, is_paid, status}]}` | insert |
+| Performance & Development | `POST /api/integration/performance` | `{ratings:[{employee_id, review_date, rating, bonus_amount}]}` | insert |
+
+Pushed data feeds payroll directly: attendance drives `days_worked`/OT/late deductions,
+performance bonuses become earnings components, employee master data supplies salary and
+payout targets. Unknown `employee_id` is rejected with a pointer to sync Core HR first.
+
+### 10.3 Outbound contracts (this system provides)
+- **Journal export** — `GET /api/integration/journal/{runId}` (scope `finance:read`) returns
+  the payroll run with its `general_ledger_entries` and `disbursement_records`, the exact
+  payload a Financial Management system needs to book accruals and settlements.
+- **Webhook events** — `EventService::emit()` fires on `payroll.submitted`,
+  `payroll.approved`, `payroll.rejected`, `payroll.paid`. Each registered
+  `webhook_endpoints` row receives a JSON POST signed with
+  `X-Signature: sha256=HMAC(body, secret)` and labeled `X-Event`. Delivery is best-effort
+  (3 s timeout) and every event is persisted to `integration_events_log` for replay/debug.
+- **Discovery** — `GET /api/integration/capabilities` (public) is a machine-readable
+  manifest of everything above: consumed endpoints + required scopes, provided endpoints +
+  event catalogue + auth model.
+
+### 10.4 Readiness verdict per connected module
+| Module | Connected via | Status |
+|---|---|---|
+| Core HR | employees push (in) | Ready — write API exists behind `X-Api-Key`; UI stays read-only by design |
+| Workforce Management | attendance + leave push (in) | Ready |
+| Performance & Development | ratings push (in) | Ready |
+| Financial Management | journal pull + payroll webhooks (out) | Ready — GL/disbursement export and signed events |
+
+Remaining gaps (acceptable for the current scope): no OAuth2/mTLS, no per-key rate limits,
+webhook delivery has no automatic retry queue (events are logged for manual replay), and
+Recruitment remains analytics-only.

@@ -26,6 +26,7 @@ export default function EmployeeProfile() {
   const month = useMemo(() => new Date().toISOString().slice(0, 7), []);
   const { data: attSummary } = useResource(`/api/attendance/summary?month=${month}`);
   const { data: leaveRequests } = useResource('/api/leave/requests');
+  const { data: incData } = useResource(`/api/incentives?employee_id=${encodeURIComponent(id)}`);
 
   if (loading) return <Loading text="Loading profile…" />;
   if (error) return <ErrorBox error={error} />;
@@ -61,6 +62,12 @@ export default function EmployeeProfile() {
     .reduce((s, a) => s + (Number(a.amount) || 0), 0);
   const loans = emp.loans || [];
   const loanBalance = loans.reduce((s, l) => s + (Number(l.balance) || 0), 0);
+
+  const structures = incData?.structures || [];
+  const earnings = incData?.earnings || [];
+  const ytdIncentives = earnings
+    .filter((e) => String(e.period || '').startsWith(String(new Date().getFullYear())))
+    .reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
 
   return (
@@ -229,6 +236,38 @@ export default function EmployeeProfile() {
             ]}
             rows={claims}
             empty="No claims logged for this employee."
+          />
+        </Card>
+      </div>
+
+      <div className="grid-2" style={{ marginBottom: 20, alignItems: 'start' }}>
+        <Card title="Active Incentive Structures" right={countBadge(structures.filter((s) => isActive(s.is_active)).length, 'success')}>
+          <DataTable
+            columns={[
+              { key: 'name', label: 'Incentive', render: (r) => <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.name}</span> },
+              { key: 'type', label: 'Type', render: (r) => <span className="badge badge-muted">{r.type}</span> },
+              { key: 'rate', label: 'Rate', render: (r) => (r.rate_type === 'Percentage' ? `${Number(r.rate) || 0}%` : money(r.rate)) },
+              { key: 'frequency', label: 'Frequency' },
+              { key: 'is_active', label: 'Status', render: (r) => <Badge>{isActive(r.is_active) ? 'Active' : 'Inactive'}</Badge> },
+            ]}
+            rows={structures}
+            empty="No incentive structures assigned."
+          />
+        </Card>
+        <Card
+          title="Incentive History"
+          right={<span style={{ fontSize: 12, color: 'var(--text-muted)' }}>YTD <strong style={{ color: 'var(--success)' }}>{money(ytdIncentives)}</strong></span>}
+        >
+          <DataTable
+            columns={[
+              { key: 'period', label: 'Period' },
+              { key: 'type', label: 'Type', render: (r) => <span className="badge badge-muted">{r.type}</span> },
+              { key: 'basis', label: 'Basis', render: (r) => <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{r.basis || '—'}</span> },
+              { key: 'amount', label: 'Amount', render: (r) => <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{money(r.amount)}</span> },
+              { key: 'status', label: 'Status', render: (r) => <Badge>{r.status === 'Paid' ? 'Paid' : 'Earned'}</Badge> },
+            ]}
+            rows={earnings}
+            empty="No incentives earned yet."
           />
         </Card>
       </div>

@@ -315,8 +315,8 @@ function DetailRow({ item, colSpan, busy, onViewPdf, onGenerate }) {
           {block('Approved Claims', null, money(item.claims_amount), semibold)}
           {block(
             'Incentives',
-            'Performance, competency, training & recognition',
-            money(num(item.performance_bonus) + num(item.competency_allowance) + num(item.training_incentive) + num(item.recognition_bonus)),
+            'Performance, competency, training, recognition & incentive plan',
+            money(num(item.performance_bonus) + num(item.competency_allowance) + num(item.training_incentive) + num(item.recognition_bonus) + num(item.incentives)),
             semibold
           )}
           {block('Deductions', 'Unpaid leave, late deductions & HMO employee share', money(num(item.unpaid_leave_deduction) + num(item.hmo_deduction) + num(item.attendance_deduction)), { ...semibold, color: 'var(--danger)' })}

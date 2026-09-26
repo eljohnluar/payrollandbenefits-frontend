@@ -7,14 +7,24 @@ import { shortDate } from '../lib/format.js';
 
 const ALLOWANCE_TYPES = ['Rice', 'Transport', 'Meal', 'Communication', 'Housing', 'Clothing', 'Position Allowance', 'Internet Allowance', 'Medical Allowance'];
 const ALLOWANCE_FREQS = ['Monthly', 'Quarterly', 'Annual', 'One-Time'];
+const INC_TYPES = ['Performance', 'Sales', 'Attendance', 'Productivity', 'Referral', 'Retention', 'Spot', 'Team'];
+const INC_MANUAL_TYPES = ['Sales', 'Productivity', 'Referral', 'Spot', 'Team'];
+const INC_FREQS = ['Monthly', 'Quarterly', 'Annual', 'One-Time'];
 const LOAN_TYPES = ['SSS Loan', 'Pag-IBIG Loan', 'Company Loan', 'Salary Advance', 'Car Loan', 'Housing Loan', 'Emergency Loan', 'Equipment Deduction', 'Other Deduction'];
 const LOAN_STATUSES = ['Active', 'Paid Off', 'Cancelled'];
 
 const today = () => new Date().toISOString().slice(0, 10);
+const thisMonth = () => new Date().toISOString().slice(0, 7);
+const monthRange = (m) => {
+  const [y, mo] = m.split('-').map(Number);
+  const last = new Date(y, mo, 0).getDate();
+  return { start: `${m}-01`, end: `${m}-${String(last).padStart(2, '0')}` };
+};
 const num = (v) => (v === '' || v === null || v === undefined ? '' : Number(v));
 
 const EMPTY_ALLOWANCE = { type: 'Rice', amount: '', frequency: 'Monthly', description: '', start_date: '', end_date: '', is_active: true };
 const EMPTY_LOAN = { loan_type: 'SSS Loan', principal: '', monthly_deduction: '', balance: '', approved_at: '', status: 'Active' };
+const EMPTY_INCENTIVE = { name: '', type: 'Performance', rate_type: 'Fixed', rate: '', frequency: 'Monthly', target: '', eligibility: '', effective_date: '', end_date: '', is_active: true };
 
 export default function Compensation() {
   const [params, setParams] = useSearchParams();
@@ -40,6 +50,24 @@ export default function Compensation() {
   // Loan modal — null | { id? } for add / edit.
   const [loanModal, setLoanModal] = useState(null);
   const [loanForm, setLoanForm] = useState(EMPTY_LOAN);
+
+  // Incentives: structures + earnings for the selected employee.
+  const [inc, setInc] = useState({ structures: [], earnings: [] });
+  const [incModal, setIncModal] = useState(null);
+  const [incForm, setIncForm] = useState(EMPTY_INCENTIVE);
+  const [metricOpen, setMetricOpen] = useState(false);
+  const [metricForm, setMetricForm] = useState({ incentive_structure_id: '', period: thisMonth(), value: '', note: '' });
+  const [computeMonth, setComputeMonth] = useState(thisMonth());
+
+  const loadIncentives = useCallback(async () => {
+    if (!id) { setInc({ structures: [], earnings: [] }); return; }
+    try {
+      const res = await api.get(`/api/incentives?employee_id=${encodeURIComponent(id)}`);
+      setInc({ structures: res.structures || [], earnings: res.earnings || [] });
+    } catch { /* silent — section shows empty state */ }
+  }, [id]);
+
+  useEffect(() => { loadIncentives(); }, [loadIncentives]);
 
   const load = useCallback(async () => {
     if (!id) { setProfile(null); return; }
@@ -175,6 +203,87 @@ export default function Compensation() {
     catch (err) { setNotice({ kind: 'error', msg: err.message }); }
   }
 
+  const setIncField = (k) => (e) => setIncForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+  const setMetric = (k) => (e) => setMetricForm((f) => ({ ...f, [k]: e.target.value }));
+
+  function openAddIncentive() {
+    setIncForm({ ...EMPTY_INCENTIVE, effective_date: today() });
+    setIncModal({});
+  }
+  function openEditIncentive(s) {
+    setIncForm({
+      name: s.name || '', type: s.type || 'Performance', rate_type: s.rate_type || 'Fixed', rate: s.rate ?? '',
+      frequency: s.frequency || 'Monthly', target: s.target ?? '', eligibility: s.eligibility || '',
+      effective_date: (s.effective_date || '').slice(0, 10), end_date: (s.end_date || '').slice(0, 10),
+      is_active: !!s.is_active,
+    });
+    setIncModal({ id: s.id });
+  }
+  async function saveIncentive(e) {
+    e.preventDefault();
+    setBusy(true);
+    const payload = { ...incForm, rate: num(incForm.rate), target: incForm.target === '' ? null : num(incForm.target) };
+    try {
+      if (incModal?.id) await api.put(`/api/incentives/${incModal.id}`, payload);
+      else await api.post('/api/incentives', { ...payload, employee_id: id });
+      setNotice({ kind: 'success', msg: incModal?.id ? 'Incentive updated.' : 'Incentive created.' });
+      setIncModal(null);
+      loadIncentives();
+    } catch (err) {
+      setNotice({ kind: 'error', msg: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function toggleIncentive(s) {
+    try {
+      await api.put(`/api/incentives/${s.id}`, { is_active: !s.is_active });
+      loadIncentives();
+    } catch (err) {
+      setNotice({ kind: 'error', msg: err.message });
+    }
+  }
+  async function computeIncentives() {
+    setBusy(true);
+    const { start, end } = monthRange(computeMonth);
+    try {
+      const res = await api.post('/api/incentives/compute', { period_start: start, period_end: end });
+      const n = res.created?.length || 0;
+      setNotice({ kind: 'success', msg: n ? `Computed ${n} incentive${n > 1 ? 's' : ''} for ${computeMonth}.` : `No new incentives earned for ${computeMonth}.` });
+      loadIncentives();
+    } catch (err) {
+      setNotice({ kind: 'error', msg: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  function openMetricModal() {
+    const manual = inc.structures.filter((s) => INC_MANUAL_TYPES.includes(s.type) && s.is_active);
+    if (!manual.length) {
+      setNotice({ kind: 'error', msg: 'Add a Sales, Productivity, Referral, Spot or Team incentive first.' });
+      return;
+    }
+    setMetricForm({ incentive_structure_id: String(manual[0].id), period: thisMonth(), value: '', note: '' });
+    setMetricOpen(true);
+  }
+  async function saveMetric(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const res = await api.post('/api/incentives/metric', {
+        incentive_structure_id: Number(metricForm.incentive_structure_id),
+        period: metricForm.period, value: Number(metricForm.value), note: metricForm.note,
+      });
+      setNotice({ kind: 'success', msg: res.shared_with ? `Team pot split ${money(res.each)} × ${res.shared_with} members.` : `Incentive recorded: ${money(res.amount)}.` });
+      setMetricOpen(false);
+      loadIncentives();
+    } catch (err) {
+      setNotice({ kind: 'error', msg: err.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Rate math mirrors compensation.php but honours system settings (defaults 22 / 8).
   const workDays = Number(settings?.work_days_per_month) || 22;
   const workHours = Number(settings?.work_hours_per_day) || 8;
@@ -252,6 +361,41 @@ export default function Compensation() {
         <button className="btn ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => del(`/api/loans/${r.id}`, 'Loan removed.')}>Delete</button>
       </span>
     ) },
+  ];
+
+  const incentiveColumns = [
+    { key: 'name', label: 'Incentive', render: (r) => <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.name}</span> },
+    { key: 'type', label: 'Type', render: (r) => <span className="badge badge-muted">{r.type}</span> },
+    { key: 'rate', label: 'Rate', render: (r) => (r.rate_type === 'Percentage' ? `${num(r.rate)}%` : money(r.rate)) },
+    { key: 'frequency', label: 'Frequency' },
+    { key: 'target', label: 'Target', render: (r) => (r.target === null || r.target === '' || r.target === undefined ? '—' : num(r.target)) },
+    { key: 'effective_date', label: 'Effective', render: (r) => shortDate(r.effective_date) },
+    { key: 'status', label: 'Status', render: (r) => (
+      <button
+        type="button"
+        className={`badge ${r.is_active ? 'badge-success' : 'badge-muted'}`}
+        style={{ border: 'none', cursor: 'pointer' }}
+        title="Click to toggle active status"
+        onClick={() => toggleIncentive(r)}
+      >
+        {r.is_active ? 'Active' : 'Inactive'}
+      </button>
+    ) },
+    { key: 'actions', label: 'Actions', align: 'right', render: (r) => (
+      <span style={{ display: 'inline-flex', gap: 6, justifyContent: 'flex-end' }}>
+        <button className="btn ghost btn-sm" onClick={() => openEditIncentive(r)}>Edit</button>
+        <button className="btn ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => del(`/api/incentives/${r.id}`, 'Incentive deactivated.')}>Remove</button>
+      </span>
+    ) },
+  ];
+
+  const earningsColumns = [
+    { key: 'period', label: 'Period' },
+    { key: 'type', label: 'Type', render: (r) => <span className="badge badge-muted">{r.type}</span> },
+    { key: 'structure_name', label: 'Incentive', render: (r) => r.structure_name || '—' },
+    { key: 'basis', label: 'Basis', render: (r) => <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{r.basis || '—'}</span> },
+    { key: 'amount', label: 'Amount', align: 'right', render: (r) => <span style={{ fontWeight: 600, color: 'var(--success)' }}>{money(r.amount)}</span> },
+    { key: 'status', label: 'Status', render: (r) => <Badge>{r.status === 'Paid' ? 'Paid via payroll' : 'Awaiting payroll'}</Badge> },
   ];
 
   const rateRow = (label, value, style) => (
@@ -391,6 +535,35 @@ export default function Compensation() {
               </Card>
             </div>
           </div>
+
+          <Card
+            title={
+              <div>
+                Incentives
+                <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Earned incentives are added to gross pay automatically in the next payroll run
+                </div>
+              </div>
+            }
+            right={
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={openMetricModal}>Record Metric</button>
+                <button type="button" className="btn btn-primary btn-sm" onClick={openAddIncentive}>+ Add Incentive</button>
+              </div>
+            }
+          >
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+              <input className="form-control" type="month" style={{ width: 170 }} value={computeMonth} onChange={(e) => setComputeMonth(e.target.value)} />
+              <button type="button" className="btn btn-secondary btn-sm" onClick={computeIncentives} disabled={busy}>Compute Period</button>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Auto-evaluates Performance, Attendance and Retention structures; record a metric for the rest.
+              </span>
+            </div>
+            <DataTable columns={incentiveColumns} rows={inc.structures} empty="No incentive structures for this employee." />
+            <div style={{ height: 16 }} />
+            <h3 style={{ fontSize: 14, margin: '0 0 8px', color: 'var(--text-main)' }}>Earned Incentives</h3>
+            <DataTable columns={earningsColumns} rows={inc.earnings} empty="No incentives earned yet." />
+          </Card>
         </>
       )}
 
@@ -506,6 +679,96 @@ export default function Compensation() {
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setLoanModal(null)}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={busy}>{loanModal?.id ? 'Update Loan' : 'Save Loan'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Add / Edit Incentive structure */}
+      <Modal open={!!incModal} onClose={() => setIncModal(null)} title={incModal?.id ? 'Edit Incentive Structure' : 'Add Incentive Structure'}>
+        <form onSubmit={saveIncentive}>
+          <div className="form-group">
+            <Field label="Incentive Name">
+              <input className="form-control" value={incForm.name} onChange={setIncField('name')} required placeholder="e.g. Sales Commission Q3" />
+            </Field>
+          </div>
+          <div className="form-grid-2">
+            <Field label="Type">
+              <select className="form-control" value={incForm.type} onChange={setIncField('type')} required>
+                {INC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+            <Field label="Frequency">
+              <select className="form-control" value={incForm.frequency} onChange={setIncField('frequency')} required>
+                {INC_FREQS.map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </Field>
+            <Field label="Rate Basis">
+              <select className="form-control" value={incForm.rate_type} onChange={setIncField('rate_type')} required>
+                <option value="Fixed">Fixed amount (PHP)</option>
+                <option value="Percentage">Percentage (%)</option>
+              </select>
+            </Field>
+            <Field label={incForm.rate_type === 'Percentage' ? 'Rate (%)' : 'Rate (PHP)'}>
+              <input className="form-control" type="number" step="0.01" min="0" value={incForm.rate} onChange={setIncField('rate')} required placeholder="0.00" />
+            </Field>
+            <Field label="Target (optional)">
+              <input className="form-control" type="number" step="0.01" value={incForm.target} onChange={setIncField('target')} placeholder="e.g. productivity output target or years of service" />
+            </Field>
+            <Field label="Eligibility (optional)">
+              <input className="form-control" value={incForm.eligibility} onChange={setIncField('eligibility')} placeholder="e.g. sales staff only" />
+            </Field>
+            <Field label="Effective Date">
+              <input className="form-control" type="date" value={incForm.effective_date} onChange={setIncField('effective_date')} required />
+            </Field>
+            <Field label="End Date (optional)">
+              <input className="form-control" type="date" value={incForm.end_date} onChange={setIncField('end_date')} />
+            </Field>
+          </div>
+          {incModal?.id && (
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-main)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={incForm.is_active} onChange={setIncField('is_active')} /> Active
+              </label>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIncModal(null)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>{incModal?.id ? 'Update Incentive' : 'Save Incentive'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Record metric for Sales / Productivity / Referral / Spot / Team */}
+      <Modal open={metricOpen} onClose={() => setMetricOpen(false)} title="Record Incentive Metric">
+        <form onSubmit={saveMetric}>
+          <div className="form-group">
+            <Field label="Incentive">
+              <select className="form-control" value={metricForm.incentive_structure_id} onChange={setMetric('incentive_structure_id')} required>
+                {inc.structures
+                  .filter((s) => INC_MANUAL_TYPES.includes(s.type) && s.is_active)
+                  .map((s) => <option key={s.id} value={s.id}>{s.name} ({s.type})</option>)}
+              </select>
+            </Field>
+          </div>
+          <div className="form-grid-2">
+            <Field label="Period">
+              <input className="form-control" type="month" value={metricForm.period} onChange={setMetric('period')} required />
+            </Field>
+            <Field label="Actual value">
+              <input className="form-control" type="number" step="0.01" min="0" value={metricForm.value} onChange={setMetric('value')} required placeholder="Sales revenue, output, or PHP amount" />
+            </Field>
+          </div>
+          <div className="form-group">
+            <Field label="Note (optional)">
+              <input className="form-control" value={metricForm.note} onChange={setMetric('note')} placeholder="e.g. January revenue, excess deliveries, referral hire" />
+            </Field>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+            Sales: value × rate%. Productivity: (value − target) × rate. Referral/Spot: value is the amount. Team: value is the pot, split equally across the department.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setMetricOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={busy}>Record</button>
           </div>
         </form>
       </Modal>

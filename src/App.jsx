@@ -12,7 +12,6 @@ import Compensation from './pages/Compensation.jsx';
 import Attendance from './pages/Attendance.jsx';
 import Tax from './pages/Tax.jsx';
 import Payslips from './pages/Payslips.jsx';
-import PayslipsViewer from './pages/PayslipsViewer.jsx';
 import Claims from './pages/Claims.jsx';
 import LogClaim from './pages/LogClaim.jsx';
 import ClaimTracker from './pages/ClaimTracker.jsx';
@@ -20,6 +19,7 @@ import Benefits from './pages/Benefits.jsx';
 import BenefitPlans from './pages/BenefitPlans.jsx';
 import ThirteenthMonth from './pages/ThirteenthMonth.jsx';
 import Settings from './pages/Settings.jsx';
+import Records from './pages/Records.jsx';
 import AuditLog from './pages/AuditLog.jsx';
 import Archive from './pages/Archive.jsx';
 import AuthConfirm from './pages/AuthConfirm.jsx';
@@ -57,7 +57,6 @@ export default function App() {
         <Route path="payroll-run" element={<PayrollRun />} />
         <Route path="tax" element={<Tax />} />
         <Route path="payslips" element={<Payslips />} />
-        <Route path="payslips-viewer" element={<PayslipsViewer />} />
         <Route path="claims" element={<Claims />} />
         <Route path="claims/new" element={<LogClaim />} />
         <Route path="claims/tracker" element={<ClaimTracker />} />
@@ -65,6 +64,7 @@ export default function App() {
         <Route path="benefit-plans" element={<BenefitPlans />} />
         <Route path="thirteenth-month" element={<ThirteenthMonth />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="records" element={<Records />} />
         <Route path="audit-log" element={<AuditLog />} />
         <Route path="archive" element={<Archive />} />
       </Route>
