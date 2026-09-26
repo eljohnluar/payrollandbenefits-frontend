@@ -1,20 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
-import { PageHeader, Card, Field, Loading, ErrorBox, Notice } from '../components/ui.jsx';
+import { PageHeader, Card, Field, Loading, ErrorBox, Notice, Modal } from '../components/ui.jsx';
 import pkg from '../../package.json';
 
-const APP_VERSION = pkg.version;
-
 export default function Settings() {
-  const { user } = useAuth();
   const { data, loading, error, reload } = useResource('/api/settings');
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
-
-  const canEdit = user?.role === 'Admin';
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pwError, setPwError] = useState('');
 
   useEffect(() => {
     if (data && typeof data === 'object') setForm({ ...data });
@@ -24,14 +21,24 @@ export default function Settings() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function save() {
-    setSaving(true); setNotice({ kind: 'info', msg: '' });
+  function openSave() {
+    setPw('');
+    setPwError('');
+    setNotice({ kind: 'info', msg: '' });
+    setPwOpen(true);
+  }
+
+  async function confirmSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    setPwError('');
     try {
-      const res = await api.put('/api/settings', form);
+      const res = await api.put('/api/settings', { ...form, password: pw });
       setForm({ ...res });
+      setPwOpen(false);
       setNotice({ kind: 'success', msg: 'Settings saved.' });
-    } catch (e) {
-      setNotice({ kind: 'error', msg: e.message });
+    } catch (err) {
+      setPwError(err.message);
     } finally {
       setSaving(false);
     }
@@ -51,7 +58,6 @@ export default function Settings() {
       className="form-control"
       type={type}
       value={form[key] ?? ''}
-      disabled={!canEdit}
       onChange={(e) => set(key, e.target.value)}
       {...props}
     />
@@ -64,24 +70,6 @@ export default function Settings() {
         subtitle="Company profile, localization, and payroll configuration applied across the system"
       />
       <Notice kind={notice.kind}>{notice.msg}</Notice>
-
-      {!canEdit && (
-        <div className="card" style={{ marginBottom: 20 }}>
-          <div
-            className="card-body"
-            style={{
-              border: '1px solid var(--warning)',
-              background: 'var(--warning-bg)',
-              color: 'var(--warning)',
-              fontSize: 13,
-              borderRadius: 'var(--radius)',
-              padding: '12px 14px',
-            }}
-          >
-            You need the Admin role to change settings. You are viewing them read-only.
-          </div>
-        </div>
-      )}
 
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <Card title="Company & Localization" body>
@@ -135,11 +123,11 @@ export default function Settings() {
             proration factors, currency display, and the company name in the header.
             <div style={{ height: 14 }} />
             {[
-              ['Application:', 'Payroll & Benefits System'],
-              ['Version:', APP_VERSION],
-              ['Environment:', import.meta.env.MODE],
-              ['Backend:', 'PHP REST API'],
-              ['Database:', 'PostgreSQL (Supabase)'],
+              ['Application:', 'Payroll Management System'],
+              ['Version:', pkg.version],
+              ['Interface:', 'Web · desktop & mobile responsive'],
+              ['Language:', navigator.language || 'English'],
+              ['Time zone:', Intl.DateTimeFormat().resolvedOptions().timeZone],
             ].map(([label, val]) => (
               <div key={label}>
                 <span style={{ color: 'var(--text-main)', fontWeight: 600 }}>{label}</span> {val}
@@ -149,14 +137,38 @@ export default function Settings() {
         </Card>
       </div>
 
-      {canEdit && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Settings'}
-          </button>
-          <button className="btn btn-secondary" onClick={reset} disabled={saving}>Reset</button>
-        </div>
-      )}
+      <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+        <button className="btn btn-primary" onClick={openSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Settings'}
+        </button>
+        <button className="btn btn-secondary" onClick={reset} disabled={saving}>Reset</button>
+      </div>
+
+      <Modal open={pwOpen} onClose={() => setPwOpen(false)} title="Confirm changes">
+        <form onSubmit={confirmSave}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
+            Settings apply to every payslip immediately. Your login password is required to confirm.
+          </p>
+          {pwError && <div className="alert error">{pwError}</div>}
+          <div className="field">
+            <label htmlFor="settings-pw">Password</label>
+            <input
+              id="settings-pw"
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setPwOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || !pw}>
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }
