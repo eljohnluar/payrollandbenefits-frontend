@@ -354,3 +354,15 @@ tfoot td { padding: 11px 14px; font-weight: 600; background: var(--surface-alt);
   .page-header h1 { font-size: 18px; }
   .stat-value { font-size: 19px; }
 }
+
+/* ── Skeleton loading: page-shaped placeholders while data loads ── */
+.skel { position: relative; overflow: hidden; background: var(--surface-alt); border-radius: 8px; }
+.skel::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .65), transparent); animation: skel-shimmer 1.3s infinite; }
+@keyframes skel-shimmer { 100% { transform: translateX(100%); } }
+.skel-page { padding: 4px 0; }
+.skel-title { height: 26px; width: 240px; margin-bottom: 18px; }
+.skel-stat { height: 92px; }
+.skel-card { height: 220px; margin-bottom: 20px; border-radius: var(--radius-lg); }
+.skel-card-sm { height: 140px; }
+.skel-cell { display: block; height: 12px; }
+@media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }

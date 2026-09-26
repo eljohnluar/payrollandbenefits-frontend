@@ -62,7 +62,17 @@ export function Card({ title, right, children, body }) {
 }
 
 export function Loading({ text = 'Loading…' }) {
-  return <div className="page-loading">{text}</div>;
+  void text;
+  return (
+    <div className="skel-page" aria-busy="true" aria-label="Loading content">
+      <div className="skel skel-title" />
+      <div className="stats-grid">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="skel skel-stat" />)}
+      </div>
+      <div className="skel skel-card" />
+      <div className="skel skel-card skel-card-sm" />
+    </div>
+  );
 }
 
 export function ErrorBox({ error }) {
@@ -76,18 +86,40 @@ export function Notice({ children, kind = 'info' }) {
 }
 
 export function DataTable({ columns, rows, loading, error, empty = 'No records yet.', foot }) {
-  if (loading) return <Loading />;
+  const head = (
+    <thead>
+      <tr>
+        {columns.map((c) => (
+          <th key={c.key} className={c.align === 'right' ? 'num' : undefined}>{c.label}</th>
+        ))}
+      </tr>
+    </thead>
+  );
+  if (loading) {
+    return (
+      <div className="table-wrap" aria-busy="true" aria-label="Loading table">
+        <table>
+          {head}
+          <tbody>
+            {[0, 1, 2, 3, 4, 5].map((r) => (
+              <tr key={r}>
+                {columns.map((c, ci) => (
+                  <td key={c.key} className={c.align === 'right' ? 'num' : undefined}>
+                    <span className="skel skel-cell" style={{ width: `${45 + ((r * 23 + ci * 17) % 50)}%` }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
   if (error) return <ErrorBox error={error} />;
   return (
     <div className="table-wrap">
       <table>
-        <thead>
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} className={c.align === 'right' ? 'num' : undefined}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
+        {head}
         <tbody>
           {rows && rows.length > 0 ? (
             rows.map((row, i) => (

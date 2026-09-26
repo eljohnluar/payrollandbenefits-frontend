@@ -4,8 +4,7 @@ import { api } from '../api/client.js';
 import { money } from '../lib/format.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { useRealtime } from '../hooks/useRealtime.js';
-import { supabase } from '../lib/supabase.js';
-import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Notice, Loading } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Loading } from '../components/ui.jsx';
 
 const shortDate = (v) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 
@@ -102,7 +101,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
-  const [live, setLive] = useState(false);
   const [busyRun, setBusyRun] = useState(null);
 
   const load = useCallback(() => {
@@ -110,10 +108,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(load, [load]);
-  useRealtime('payroll_runs', () => {
-    setLive(true);
-    load();
-  });
+  useRealtime('payroll_runs', load);
 
   const canApprove = ['Admin', 'Finance'].includes(user?.role);
 
@@ -150,14 +145,6 @@ export default function Dashboard() {
         subtitle={today}
         right={<button className="btn btn-secondary" onClick={load}>Refresh</button>}
       />
-
-      <Notice>
-        {supabase
-          ? live
-            ? 'Live — receiving Supabase Realtime updates'
-            : 'Waiting for realtime events…'
-          : 'Realtime offline (set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY)'}
-      </Notice>
 
       <ErrorBox error={error} />
       {!summary && !error && <Loading text="Loading summary…" />}

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext.jsx';
+import { Loading } from './components/ui.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -27,7 +28,7 @@ import Terms from './pages/Terms.jsx';
 
 function RequireAuth({ children }) {
   const { user, ready } = useAuth();
-  if (!ready) return <div className="page-loading">Loading…</div>;
+  if (!ready) return <Loading />;
   if (!user) return <Navigate to="/login" replace />;
   return children;
 }

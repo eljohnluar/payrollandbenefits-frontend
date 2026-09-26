@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, qs } from '../api/client.js';
-import { PageHeader, Card, DataTable, Badge, Notice } from '../components/ui.jsx';
+import { PageHeader, Card, DataTable, Badge, Notice, Modal } from '../components/ui.jsx';
 
 const parseTs = (iso) => new Date(String(iso).replace(' ', 'T').replace(/\+00$/, '+00:00'));
 const fmtDate = (iso) => {
@@ -27,6 +27,11 @@ export default function AuditLog() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPw, setResetPw] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState('');
+  const [notice, setNotice] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,14 +52,39 @@ export default function AuditLog() {
 
   const set = (k) => (e) => setFilters((f) => ({ ...f, [k]: e.target.value }));
 
+  async function resetNow(event) {
+    event.preventDefault();
+    setResetBusy(true);
+    setResetError('');
+    try {
+      const res = await api.post('/api/audit/reset', { password: resetPw });
+      setResetOpen(false);
+      setResetPw('');
+      setNotice(`Audit log cleared — ${res.deleted} entr${res.deleted === 1 ? 'y' : 'ies'} removed.`);
+      load();
+    } catch (e) {
+      setResetError(e.message);
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
   return (
     <>
       <PageHeader
         title="Audit Log"
         subtitle="Every user action with date, time and IP address"
-        right={<span className="badge badge-muted">{total} entries</span>}
+        right={
+          <>
+            <span className="badge badge-muted">{total} entries</span>
+            <button className="btn btn-danger" style={{ marginLeft: 10 }} onClick={() => { setResetOpen(true); setResetError(''); }}>
+              Reset Log
+            </button>
+          </>
+        }
       />
       <Notice kind="error">{error}</Notice>
+      {notice && <Notice kind="success">{notice}</Notice>}
 
       <div className="filters-bar">
         <input className="form-control" placeholder="Search action or details…" value={filters.search} onChange={set('search')} style={{ maxWidth: 260 }} />
@@ -83,6 +113,32 @@ export default function AuditLog() {
           empty="No matching audit entries."
         />
       </Card>
+
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Reset audit log">
+        <form onSubmit={resetNow}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-muted)' }}>
+            This permanently deletes every audit entry. Your login password is required to confirm.
+          </p>
+          {resetError && <div className="alert error">{resetError}</div>}
+          <div className="field">
+            <label htmlFor="audit-reset-pw">Password</label>
+            <input
+              id="audit-reset-pw"
+              type="password"
+              value={resetPw}
+              onChange={(e) => setResetPw(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setResetOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-danger" disabled={resetBusy || !resetPw}>
+              {resetBusy ? 'Clearing…' : 'Clear audit log'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }
