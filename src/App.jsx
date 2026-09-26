@@ -21,6 +21,9 @@ import ThirteenthMonth from './pages/ThirteenthMonth.jsx';
 import Settings from './pages/Settings.jsx';
 import AuditLog from './pages/AuditLog.jsx';
 import Archive from './pages/Archive.jsx';
+import AuthConfirm from './pages/AuthConfirm.jsx';
+import AuthReset from './pages/AuthReset.jsx';
+import Terms from './pages/Terms.jsx';
 
 function RequireAuth({ children }) {
   const { user, ready } = useAuth();
@@ -34,6 +37,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/auth/confirm" element={<AuthConfirm />} />
+      <Route path="/auth/reset" element={<AuthReset />} />
+      <Route path="/terms" element={<Terms />} />
       <Route
         path="/"
         element={

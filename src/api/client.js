@@ -80,6 +80,26 @@ export const qs = (params = {}) => {
   return entries.length ? `?${new URLSearchParams(entries).toString()}` : '';
 };
 
+/**
+ * Exchanges a Supabase access token for an app JWT. Returns {status, payload}
+ * without throwing — callers branch on needs_registration_code / needs_password.
+ */
+async function supabaseLogin(accessToken, extra = {}) {
+  const response = await fetch(`${BASE}/api/auth/supabase`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ access_token: accessToken, ...extra }),
+  });
+  const text = await response.text();
+  let payload;
+  try {
+    payload = text ? JSON.parse(text) : {};
+  } catch {
+    payload = { error: 'Unexpected server response.' };
+  }
+  return { status: response.status, payload };
+}
+
 export const api = {
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body ?? {}),
@@ -90,5 +110,7 @@ export const api = {
   postObjectUrl: (path, body) => postObjectUrl(path, body),
   login: (email, password) => request('POST', '/api/auth/login', { email, password }),
   register: (payload) => request('POST', '/api/auth/register', payload),
+  supabaseLogin,
+  resetPassword: (accessToken, password) => request('POST', '/api/auth/reset-password', { access_token: accessToken, password }),
   health: () => request('GET', '/api/health'),
 };

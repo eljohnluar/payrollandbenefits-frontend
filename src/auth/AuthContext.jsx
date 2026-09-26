@@ -75,6 +75,10 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const result = await api.login(email, password);
+    if (result?.otp_required) {
+      // Password accepted; the session only starts after the email code.
+      return result;
+    }
     setToken(result.token);
     sessionStorage.removeItem('payroll.logoutMsg');
     setLogoutMessage('');
@@ -82,7 +86,19 @@ export function AuthProvider({ children }) {
     return result.user;
   }, []);
 
-  const value = useMemo(() => ({ user, ready, login, logout, logoutMessage }), [user, ready, login, logout, logoutMessage]);
+  /** Signs the app into a {token, user} result returned by /api/auth/supabase. */
+  const adoptSession = useCallback((result) => {
+    setToken(result.token);
+    sessionStorage.removeItem('payroll.logoutMsg');
+    setLogoutMessage('');
+    setUser(result.user);
+    return result.user;
+  }, []);
+
+  const value = useMemo(
+    () => ({ user, ready, login, logout, logoutMessage, adoptSession }),
+    [user, ready, login, logout, logoutMessage, adoptSession]
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

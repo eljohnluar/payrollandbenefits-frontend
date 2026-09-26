@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { api } from '../api/client.js';
+import { supabase } from '../lib/supabase.js';
+import { PASSWORD_RULES, passwordProblem } from '../lib/password.js';
+import { GoogleG } from '../components/GoogleIcon.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const ICONS = {
@@ -45,15 +48,86 @@ export default function Register() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [company, setCompany] = useState('');
+  const [agreed, setAgreed] = useState(false);
+
+  useEffect(() => {
+    api.get('/api/branding').then((b) => setCompany(b?.company_name || '')).catch(() => {});
+  }, []);
 
   if (user) return <Navigate to="/" replace />;
 
-  async function submit(event) {
-    event.preventDefault();
-    setBusy(true);
+  async function registerWithGoogle() {
+    if (!agreed) {
+      setError('Please read and accept the Terms and Conditions before registering.');
+      return;
+    }
+    setGoogleBusy(true);
     setError('');
     setSuccess('');
+    const { error: sbError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/confirm`,
+        queryParams: { prompt: 'select_account' },
+      },
+    });
+    if (sbError) {
+      setGoogleBusy(false);
+      setError(
+        sbError.message.toLowerCase().includes('not configured')
+          ? 'Google registration is not enabled on the server yet — ask the administrator to enable the Google provider in Supabase.'
+          : sbError.message
+      );
+    }
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      setError('Enter a valid email address (e.g. name@company.com).');
+      return;
+    }
+    if (username.trim().length < 2) {
+      setError('Display name must be at least 2 characters.');
+      return;
+    }
+    const pwIssue = passwordProblem(password);
+    if (pwIssue) {
+      setError(pwIssue);
+      return;
+    }
+    if (!registrationCode.trim()) {
+      setError('The registration code from HR is required.');
+      return;
+    }
+    if (!agreed) {
+      setError('Please read and accept the Terms and Conditions before registering.');
+      return;
+    }
+    setBusy(true);
     try {
+      if (supabase) {
+        const { data, error: sbError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/confirm`,
+            data: { name: username, registration_code: registrationCode },
+          },
+        });
+        if (sbError) throw new Error(sbError.message);
+        if (data.session) {
+          navigate('/auth/confirm', { replace: true });
+          return;
+        }
+        setSuccess('We sent a confirmation link to your email. Click it, then finish activating your account.');
+        setPassword('');
+        return;
+      }
       await api.register({ email, username, password, registration_code: registrationCode });
       setSuccess('Registration successful. You can now login with your email.');
       setPassword('');
@@ -71,8 +145,9 @@ export default function Register() {
       <div className="login-card">
         <div className="login-hero">
           <div className="login-logo"><img src="/logo.jpg" alt="Company logo" /></div>
-          <h1>Create your account</h1>
-          <p>Join your workspace with an HR registration code</p>
+          {company && <div className="brand-company">{company}</div>}
+          <h1>Payroll Management System</h1>
+          <p>Create your account — join with an HR registration code</p>
         </div>
         <form className="login-body" onSubmit={submit}>
           {error && <div className="alert error">{error}</div>}
@@ -98,11 +173,21 @@ export default function Register() {
             <label htmlFor="password">Password</label>
             <div className="input-wrap">
               <span className="lead-icon"><Icon name="lock" /></span>
-              <input id="password" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+              <input id="password" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="Strong password required" required />
               <button type="button" className="eye-btn" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((v) => !v)}>
                 <EyeIcon off={showPw} />
               </button>
             </div>
+            <ul className="pw-checks" aria-label="Password requirements">
+              {PASSWORD_RULES.map((rule) => {
+                const ok = rule.test(password);
+                return (
+                  <li key={rule.id} className={ok ? 'ok' : ''}>
+                    <span className="dot">{ok ? '✓' : '○'}</span> {rule.label}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
           <div className="login-field">
@@ -113,9 +198,33 @@ export default function Register() {
             </div>
           </div>
 
+          <div className="login-field terms-actions">
+            <input
+              id="terms-agree"
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => { setAgreed(e.target.checked); setError(''); }}
+            />
+            <label htmlFor="terms-agree">
+              I have read and agree to the{' '}
+              <Link to="/terms" target="_blank" rel="noreferrer">Terms and Conditions</Link>
+              {' '}of the Payroll Management System.
+            </label>
+          </div>
+
           <button type="submit" className="btn-block" disabled={busy}>
             {busy ? 'Creating account…' : 'Register'}
           </button>
+
+          {supabase && (
+            <div className="otp-block">
+              <div className="otp-divider"><span>or</span></div>
+              <button type="button" className="btn-block secondary google-btn" onClick={registerWithGoogle} disabled={busy || googleBusy}>
+                <GoogleG /> {googleBusy ? 'Opening Google…' : 'Register with Gmail'}
+              </button>
+              <p className="google-note">Gmail sign-up is verified by Google; you will still enter your HR registration code on the next step.</p>
+            </div>
+          )}
 
           <div className="login-note">
             New accounts are created with the HR role. Already registered?{' '}
