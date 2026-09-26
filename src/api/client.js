@@ -4,7 +4,7 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-const BASE = import.meta.env.VITE_API_BASE || '';
+const BASE = (import.meta.env.VITE_API_BASE || '').replace(/\/+$/, '');
 
 /** Notify the app when the server rejects the token (401) — used for idle/session handling. */
 const authLostListeners = new Set();
