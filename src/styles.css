@@ -59,8 +59,8 @@ a { color: inherit; text-decoration: none; }
   .app-shell, .app-shell.sb-collapsed { --sidebar-w: 0px; }
   .app-side { width: 262px; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 4px 0 24px rgba(0, 0, 0, .35); }
   .app-shell:not(.sb-collapsed) .app-side { transform: translateX(0); }
-  .sidebar-toggle { left: 10px; top: 70px; }
-  .app-shell:not(.sb-collapsed) .sidebar-toggle { left: 272px; }
+  .sidebar-toggle { left: 10px; top: 17px; }
+  .app-shell:not(.sb-collapsed) .sidebar-toggle { left: 272px; top: 17px; }
   .app-shell:not(.sb-collapsed) .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(15, 12, 25, .5); z-index: 190; }
   /* the drawer always shows full labels on phones, regardless of desktop collapse state */
   .app-shell.sb-collapsed .brand { justify-content: flex-start; padding-left: 18px; padding-right: 18px; }
@@ -344,7 +344,8 @@ tfoot td { padding: 11px 14px; font-weight: 600; background: var(--surface-alt);
   .table-wrap { -webkit-overflow-scrolling: touch; }
   .table-wrap table { font-size: 12.5px; }
 
-  .notif-dropdown { position: fixed; left: 10px; right: 10px; top: 54px; width: auto; }
+  .notif-dropdown { position: fixed; right: 10px; top: 52px; width: min(300px, calc(100vw - 20px)); max-height: 55vh; overflow: hidden; display: flex; flex-direction: column; }
+  .notif-list { max-height: none; flex: 1; }
 
   .login-wrap { padding: 18px 10px; }
 }
