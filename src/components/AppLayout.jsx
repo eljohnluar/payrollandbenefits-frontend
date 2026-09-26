@@ -79,7 +79,11 @@ function useClock() {
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === '1');
+  const [collapsed, setCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved !== null) return saved === '1';
+    return window.innerWidth <= 900; // phones start with the drawer closed
+  });
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
@@ -91,6 +95,13 @@ export default function AppLayout() {
       localStorage.setItem('sidebarCollapsed', c ? '0' : '1');
       return !c;
     });
+  }
+
+  function closeSidebarOnPhone() {
+    if (window.innerWidth <= 900) {
+      localStorage.setItem('sidebarCollapsed', '1');
+      setCollapsed(true);
+    }
   }
 
   async function loadNotifications() {
@@ -122,11 +133,12 @@ export default function AppLayout() {
 
   return (
     <div className={`app-shell${collapsed ? ' sb-collapsed' : ''}`}>
-      <button className="sidebar-toggle" type="button" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={toggleSidebar}>
+      <button className="sidebar-toggle" type="button" title={collapsed ? 'Show menu' : 'Hide menu'} onClick={toggleSidebar}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points={collapsed ? CHEVRON.right : CHEVRON.left} />
         </svg>
       </button>
+      <div className="sidebar-backdrop" onClick={toggleSidebar} />
       <aside className="app-side">
         <div className="brand">
           <img src="/logo.jpg" alt="Company logo" />
@@ -144,6 +156,7 @@ export default function AppLayout() {
                   key={link.to}
                   to={link.to}
                   end={link.end}
+                  onClick={closeSidebarOnPhone}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
                 >
                   <Icon name={link.icon} />

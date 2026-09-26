@@ -53,6 +53,28 @@ a { color: inherit; text-decoration: none; }
 .app-side .side-foot .btn.ghost { width: 100%; justify-content: center; background: transparent; color: #d5d1e4; border-color: #3a3654; }
 .app-side .side-foot .btn.ghost:hover:not(:disabled) { background: rgba(255, 255, 255, .06); border-color: #443f63; color: #fff; }
 
+/* ── Mobile: sidebar becomes a hidden slide-over drawer; only the toggle stays visible ── */
+.sidebar-backdrop { display: none; }
+@media (max-width: 900px) {
+  .app-shell, .app-shell.sb-collapsed { --sidebar-w: 0px; }
+  .app-side { width: 262px; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 4px 0 24px rgba(0, 0, 0, .35); }
+  .app-shell:not(.sb-collapsed) .app-side { transform: translateX(0); }
+  .sidebar-toggle { left: 10px; top: 70px; }
+  .app-shell:not(.sb-collapsed) .sidebar-toggle { left: 272px; }
+  .app-shell:not(.sb-collapsed) .sidebar-backdrop { display: block; position: fixed; inset: 0; background: rgba(15, 12, 25, .5); z-index: 190; }
+  /* the drawer always shows full labels on phones, regardless of desktop collapse state */
+  .app-shell.sb-collapsed .brand { justify-content: flex-start; padding-left: 18px; padding-right: 18px; }
+  .app-shell.sb-collapsed .side-nav { padding: 12px 10px; }
+  .app-shell.sb-collapsed .side-foot { padding: 14px; text-align: left; }
+  .app-shell.sb-collapsed .brand-text,
+  .app-shell.sb-collapsed .nav-section-label,
+  .app-shell.sb-collapsed .nav-text,
+  .app-shell.sb-collapsed .side-foot .user-text,
+  .app-shell.sb-collapsed .side-foot button span { display: revert; }
+  .app-shell.sb-collapsed .nav-link { justify-content: flex-start; gap: 10px; padding: 9px 11px; }
+  .app-shell.sb-collapsed .side-foot button { justify-content: center; }
+}
+
 .app-body { margin-left: var(--sidebar-w); min-width: 0; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left .25s ease; }
 .app-main { padding: 26px 30px; flex: 1; }
 .page-loading { padding: 40px; color: var(--text-muted); }
@@ -166,6 +188,12 @@ input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px 
 .topbar-clock { font-size: 13px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; letter-spacing: .5px; white-space: nowrap; }
 .topbar-user { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-main); }
 .topbar-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-light); color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+/* Mobile navbar: hide page title, company name and profile icon; push the rest right.
+   Placed after the base .topbar rules on purpose — same specificity, later wins. */
+@media (max-width: 900px) {
+  .topbar-left, .topbar-user { display: none; }
+  .topbar { justify-content: flex-end; }
+}
 .notif-btn { padding: 6px 8px; }
 .notif-dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; }
 .notif-dropdown { position: absolute; right: 0; top: 44px; width: 300px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); z-index: 500; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
