@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
@@ -62,8 +62,6 @@ const SECTIONS = [
   },
 ];
 
-const ALL_LINKS = SECTIONS.flatMap((s) => s.links);
-
 const CHEVRON = { left: '15 18 9 12 15 6', right: '9 18 15 12 9 6' };
 
 function useClock() {
@@ -78,7 +76,6 @@ function useClock() {
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
-  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
     if (saved !== null) return saved === '1';
@@ -126,10 +123,6 @@ export default function AppLayout() {
       loadNotifications();
     } catch { /* silent */ }
   }
-
-  const active = [...ALL_LINKS]
-    .sort((a, b) => b.to.length - a.to.length)
-    .find((l) => (l.end ? location.pathname === l.to : location.pathname.startsWith(l.to)));
 
   return (
     <div className={`app-shell${collapsed ? ' sb-collapsed' : ''}`}>
@@ -182,7 +175,6 @@ export default function AppLayout() {
       <div className="app-body">
         <header className="topbar">
           <div className="topbar-left">
-            <div className="topbar-title">{active?.text ?? 'Payroll & Benefits'}</div>
             <div className="topbar-meta">{company}</div>
           </div>
           <div className="topbar-actions">

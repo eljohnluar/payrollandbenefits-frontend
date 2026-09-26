@@ -62,7 +62,6 @@ export default function EmployeeProfile() {
   const loans = emp.loans || [];
   const loanBalance = loans.reduce((s, l) => s + (Number(l.balance) || 0), 0);
 
-  const coreCards = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, fontSize: 13 };
 
   return (
     <>
@@ -108,7 +107,7 @@ export default function EmployeeProfile() {
 
       <div className="grid-2" style={{ marginBottom: 20, alignItems: 'start' }}>
         <Card title="Core HR & Employment Details" body>
-          <div style={coreCards}>
+          <div className="profile-cards">
             <Row label="Employee Code">{emp.code}</Row>
             <Row label="Full Name">{fullName}</Row>
             <Row label="Position">{emp.position}</Row>
@@ -126,7 +125,7 @@ export default function EmployeeProfile() {
         </Card>
 
         <Card title="Compensation & Disbursement Details" body>
-          <div style={coreCards}>
+          <div className="profile-cards">
             <div>
               <div className="stat-label">Monthly Basic Salary</div>
               <div style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: 16 }}>{money(basic)}</div>

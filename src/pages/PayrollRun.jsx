@@ -652,7 +652,7 @@ export default function PayrollRun() {
             <Stat label="Headcount" value={<>{included.length} <span style={{ ...muted, fontSize: 14 }}>/ {items.length}</span></>} />
           </StatsGrid>
 
-          <div className="grid-2" style={{ gridTemplateColumns: '3fr 2fr', marginTop: 20, marginBottom: 20, alignItems: 'start' }}>
+          <div className="charts-grid">
             <Card title="Payroll Cost Trend" right={<span style={{ ...muted, fontSize: 12 }}>Net pay vs deductions per payroll run · since {shortDate(cutoffLabel)}</span>} body>
               <TrendChart trend={trend} />
             </Card>

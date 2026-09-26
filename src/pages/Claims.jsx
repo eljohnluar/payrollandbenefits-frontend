@@ -70,7 +70,7 @@ export default function Claims() {
           {STATUSES.map((s) => <option key={s} value={s}>{s} ({counts[s] || 0})</option>)}
         </select>
       </div>
-      <div className="grid-2" style={{ gridTemplateColumns: '1fr 380px', alignItems: 'start' }}>
+      <div className="claims-grid">
         <Card title="Claims">
           {loading ? <Loading /> : error ? <ErrorBox error={error} /> : (
             <div className="table-wrap">
