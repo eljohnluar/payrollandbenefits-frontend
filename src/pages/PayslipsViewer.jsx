@@ -3,7 +3,7 @@ import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
 import { shortDate } from '../lib/format.js';
 import {
-  PageHeader, StatsGrid, Stat, Card, DataTable, Badge, Modal, ErrorBox, Loading, money,
+  PageHeader, StatsGrid, Stat, Card, DataTable, Badge, Modal, ErrorBox, Loading, Notice, money,
 } from '../components/ui.jsx';
 import PayslipGate from '../components/PayslipGate.jsx';
 
@@ -172,7 +172,7 @@ export default function PayslipsViewer() {
         }
       />
 
-      <Notice kind="success">{deleteNotice}</Notice>
+      {deleteNotice && <Notice kind="success">{deleteNotice}</Notice>}
 
       <div className="filters-bar">
         <select className="form-control" aria-label="Year" value={year} onChange={(e) => setYear(e.target.value)}>
