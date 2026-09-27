@@ -7,6 +7,45 @@ import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money } from '../co
 
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'Paid'];
 
+const OCR_KIND = { Passed: 'success', Flagged: 'error', Error: 'error', 'No receipt': 'info', Skipped: 'info' };
+
+function ReceiptOcrPanel({ detail }) {
+  let flags = [];
+  try {
+    flags = detail.ocr_flags ? (typeof detail.ocr_flags === 'string' ? JSON.parse(detail.ocr_flags) : detail.ocr_flags) : [];
+  } catch { flags = [String(detail.ocr_flags)]; }
+  const fields = [
+    ['Merchant', detail.ocr_merchant],
+    ['Receipt date', detail.ocr_receipt_date],
+    ['Amount', detail.ocr_amount !== null && detail.ocr_amount !== undefined ? money(detail.ocr_amount) : null],
+    ['OR / Invoice', detail.ocr_or_number],
+    ['TIN', detail.ocr_tin],
+    ['Confidence', detail.ocr_confidence !== null && detail.ocr_confidence !== undefined ? `${detail.ocr_confidence}%` : null],
+  ].filter(([, v]) => v !== null && v !== undefined && v !== '');
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontWeight: 700, fontSize: 13 }}>
+          Receipt OCR{detail.ocr_provider === 'tabscanner' ? ' (Tabscanner)' : detail.ocr_provider === 'google-vision' ? ' (Google Vision)' : ''}
+        </span>
+        <span className={`badge badge-${OCR_KIND[detail.ocr_status] || 'muted'}`}>{detail.ocr_status}</span>
+      </div>
+      {fields.length > 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.8 }}>
+          {fields.map(([label, value]) => (
+            <div key={label}><span style={{ fontWeight: 600 }}>{label}:</span> {String(value)}</div>
+          ))}
+        </div>
+      )}
+      {flags.length > 0 && (
+        <div className="alert error" style={{ marginTop: 8, marginBottom: 0 }}>
+          {flags.map((f) => <div key={f}>{f}</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Claims() {
   const { user } = useAuth();
   const role = String(user?.role || '');
@@ -116,6 +155,7 @@ export default function Claims() {
                     {detail.description || '—'}
                   </div>
                 </div>
+                {detail.ocr_status && <ReceiptOcrPanel detail={detail} />}
               </div>
               {detail.status === 'Pending' && canReview && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>

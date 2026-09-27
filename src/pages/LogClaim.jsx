@@ -7,11 +7,22 @@ import { PageHeader, Card, Notice, money } from '../components/ui.jsx';
 const TODAY = new Date().toISOString().slice(0, 10);
 const EMPTY_FORM = { employee_id: '', description: '', category: '', amount: '', claim_date: '' };
 
+const parseFlags = (raw) => {
+  if (!raw) return [];
+  try {
+    const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [String(raw)];
+  }
+};
+
 export default function LogClaim() {
   const navigate = useNavigate();
   const { data: employees } = useResource('/api/employees');
   const { data: categories } = useResource('/api/claims/categories');
   const [form, setForm] = useState(EMPTY_FORM);
+  const [receipt, setReceipt] = useState(null); // { base64, mime, name }
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
   const [submitted, setSubmitted] = useState(null);
@@ -19,14 +30,40 @@ export default function LogClaim() {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const cat = (categories || []).find((c) => c.name === form.category || c.id === form.category);
 
+  async function onReceipt(e) {
+    const file = e.target.files?.[0];
+    if (!file) { setReceipt(null); return; }
+    if (file.size > 4 * 1024 * 1024) {
+      setNotice({ kind: 'error', msg: 'Receipt must be 4MB or smaller.' });
+      e.target.value = '';
+      return;
+    }
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read the receipt file.'));
+      reader.readAsDataURL(file);
+    }).catch(() => null);
+    if (!dataUrl) {
+      setNotice({ kind: 'error', msg: 'Could not read the receipt file.' });
+      return;
+    }
+    setReceipt({ base64: dataUrl.split(',')[1], mime: file.type || 'image/jpeg', name: file.name });
+  }
+
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setNotice({ kind: 'info', msg: '' });
     try {
-      const created = await api.post('/api/claims/submit', { ...form, category: form.category });
+      const created = await api.post('/api/claims/submit', {
+        ...form,
+        receipt_base64: receipt?.base64,
+        receipt_mime: receipt?.mime,
+      });
       setSubmitted(created?.data ?? created);
       setForm((f) => ({ ...EMPTY_FORM, claim_date: f.claim_date }));
+      setReceipt(null);
     } catch (err) {
       setNotice({ kind: 'error', msg: err.message });
     } finally {
@@ -51,6 +88,17 @@ export default function LogClaim() {
               <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                 {submitted.claim_number ? `Claim ${submitted.claim_number} is pending HR approval.` : 'Your claim is pending HR approval.'}
               </p>
+              {submitted.ocr_status && submitted.ocr_status !== 'Passed' && (
+                <div className="alert info" style={{ textAlign: 'left', marginTop: 16 }}>
+                  <strong>Receipt check: {submitted.ocr_status}.</strong>{' '}
+                  {parseFlags(submitted.ocr_flags).map((f) => <div key={f} style={{ fontSize: 12 }}>{f}</div>)}
+                </div>
+              )}
+              {submitted.ocr_status === 'Passed' && (
+                <div className="alert success" style={{ textAlign: 'left', marginTop: 16 }}>
+                  Receipt verified automatically — merchant “{submitted.ocr_merchant}”, total {money(submitted.ocr_amount)}.
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
                 <button type="button" className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={resetAnother}>
                   Log Another Claim
@@ -105,8 +153,10 @@ export default function LogClaim() {
                 </div>
                 <div className="field">
                   <label htmlFor="lc-receipt">Receipt</label>
-                  <input id="lc-receipt" type="file" className="form-control" accept=".jpg,.jpeg,.png,.webp,.application/pdf" />
-                  <small style={{ color: 'var(--text-muted)' }}>JPG, PNG, WEBP or PDF up to 10MB</small>
+                  <input id="lc-receipt" type="file" className="form-control" accept=".jpg,.jpeg,.png,.webp,.application/pdf" onChange={onReceipt} />
+                  <small style={{ color: 'var(--text-muted)' }}>
+                    {receipt ? `Attached: ${receipt.name} — verified by OCR on submit` : 'JPG, PNG, WEBP or PDF up to 4MB — read by Google Vision OCR'}
+                  </small>
                 </div>
               </div>
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
