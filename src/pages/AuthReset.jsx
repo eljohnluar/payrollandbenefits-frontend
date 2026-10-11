@@ -133,7 +133,7 @@ export default function AuthReset() {
           )}
           {status === 'error' && (
             <div className="login-note">
-              <Link to="/login" style={{ fontWeight: 600, color: '#7c3aed' }}>Back to sign in</Link>
+              <Link to="/login" style={{ fontWeight: 600, color: 'var(--primary)' }}>Back to sign in</Link>
             </div>
           )}
         </form>

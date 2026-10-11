@@ -4,6 +4,7 @@ import { Loading } from './components/ui.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
+import Landing from './pages/Landing.jsx';
 import PayrollRun from './pages/PayrollRun.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Employees from './pages/Employees.jsx';
@@ -26,11 +27,10 @@ import AuthConfirm from './pages/AuthConfirm.jsx';
 import AuthReset from './pages/AuthReset.jsx';
 import Terms from './pages/Terms.jsx';
 
-function RequireAuth({ children }) {
+function HomeGate() {
   const { user, ready } = useAuth();
   if (!ready) return <Loading />;
-  if (!user) return <Navigate to="/login" replace />;
-  return children;
+  return user ? <AppLayout /> : <Landing />;
 }
 
 export default function App() {
@@ -43,11 +43,7 @@ export default function App() {
       <Route path="/terms" element={<Terms />} />
       <Route
         path="/"
-        element={
-          <RequireAuth>
-            <AppLayout />
-          </RequireAuth>
-        }
+        element={<HomeGate />}
       >
         <Route index element={<Dashboard />} />
         <Route path="employees" element={<Employees />} />

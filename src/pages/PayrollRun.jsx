@@ -17,7 +17,7 @@ const DONUT_COLORS = [
   { label: 'PhilHealth', key: 'philhealth_ee', color: '#10b981' },
   { label: 'Pag-IBIG', key: 'pagibig_ee', color: '#f59e0b' },
   { label: 'Withholding Tax', key: 'withholding_tax', color: '#dc2626' },
-  { label: 'Loans', key: 'loans_deduction', color: '#8b5cf6' },
+  { label: 'Loans', key: 'loans_deduction', color: '#6EE7B7' },
   { label: 'HMO', key: 'hmo_deduction', color: '#ec4899' },
   { label: 'Unpaid Leave', key: 'unpaid_leave_deduction', color: '#64748b' },
   { label: 'Late Deduction', key: 'attendance_deduction', color: '#f97316' },
@@ -253,7 +253,7 @@ function FinancePanels({ run, snapshot, canFinance, busy, onDecide, onMarkPaid, 
   }
   if (run.status === 'Paid') {
     return (
-      <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--primary)', background: 'rgba(59, 130, 246, 0.05)' }}>
+      <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--primary)', background: 'rgba(5, 150, 105, 0.05)' }}>
         <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
             <h4 style={{ margin: 0, color: 'var(--text-main)' }}>💰 Disbursed &amp; Completed</h4>
@@ -728,7 +728,7 @@ export default function PayrollRun() {
 
           {/* Automated outputs banner */}
           <div className="card" style={{ marginBottom: 20 }}>
-            <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(124, 58, 237, 0.1)', borderLeft: '4px solid var(--primary)' }}>
+            <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(5, 150, 105, 0.1)', borderLeft: '4px solid var(--primary)' }}>
               <div style={{ fontSize: 24 }}>📄</div>
               <div>
                 <h4 style={{ color: 'var(--text-main)', margin: '0 0 4px' }}>Automated Outputs</h4>
