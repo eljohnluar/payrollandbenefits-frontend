@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
 import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money } from '../components/ui.jsx';
@@ -7,6 +6,7 @@ import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money } from '../co
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'Paid'];
 
 const OCR_KIND = { Passed: 'success', Flagged: 'error', Error: 'error', 'No receipt': 'info', Skipped: 'info' };
+
 
 function ReceiptOcrPanel({ detail }) {
   let flags = [];
@@ -84,9 +84,7 @@ export default function Claims() {
 
   return (
     <>
-      <PageHeader title="Claims Management" subtitle="Manually review and process employee reimbursement claims." right={
-        <Link to="/claims/new" className="btn btn-primary">+ Log Claim</Link>
-      } />
+      <PageHeader title="Claims Management" subtitle="Employees file reimbursement claims from their portal; review and process them here." />
       <Notice kind={notice.kind}>{notice.msg}</Notice>
       <div className="filters-bar">
         <select className="form-control" value={status} onChange={(e) => setStatus(e.target.value)}>

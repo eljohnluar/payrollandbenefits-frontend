@@ -44,8 +44,6 @@ const HR_SECTIONS = [
     label: 'Claims & Benefits',
     links: [
       { to: '/claims', text: 'Claims', end: true, icon: 'clipboard' },
-      { to: '/claims/new', text: 'Log Claim', icon: 'plus' },
-      { to: '/claims/tracker', text: 'Claim Tracker', icon: 'search' },
       { to: '/benefits', text: 'Benefits', icon: 'heart' },
       { to: '/benefit-plans', text: 'Benefit Plans', icon: 'shield' },
       { to: '/thirteenth-month', text: '13th Month Pay', icon: 'gift' },

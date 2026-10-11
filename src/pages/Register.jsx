@@ -153,7 +153,7 @@ export default function Register() {
           'Employee portal: attendance per cut-off, adjustments, claims, benefits, payroll summary',
           'HR Admin: full payroll, compensation, attendance and reporting workspace',
           'A registration code from the company is required',
-          'Employee sign-ups link to your records via the company email on file — or your employee code (e.g. EMP-2026-001) if you use a personal email',
+          'Employee sign-ups are always accepted — the account links to your records automatically when your email or employee code matches, and HR can attach it later either way',
         ],
         foot: 'Password resets are handled by the system administrator — there is no self-service reset.',
       }}
@@ -230,7 +230,7 @@ export default function Register() {
 
         {accountType === 'Employee' && (
           <div className="login-field">
-            <label htmlFor="employee_code">Employee code <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional — if your email isn’t on file)</span></label>
+            <label htmlFor="employee_code">Employee code <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional — links your account instantly)</span></label>
             <div className="input-wrap">
               <span className="lead-icon"><Icon name="user" /></span>
               <input id="employee_code" type="text" value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())} placeholder="e.g. EMP-2026-001" />

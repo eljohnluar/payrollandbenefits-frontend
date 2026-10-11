@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext.jsx';
 import { Loading } from './components/ui.jsx';
 import AppLayout from './components/AppLayout.jsx';
@@ -13,8 +13,6 @@ import Compensation from './pages/Compensation.jsx';
 import Attendance from './pages/Attendance.jsx';
 import Tax from './pages/Tax.jsx';
 import Claims from './pages/Claims.jsx';
-import LogClaim from './pages/LogClaim.jsx';
-import ClaimTracker from './pages/ClaimTracker.jsx';
 import Benefits from './pages/Benefits.jsx';
 import BenefitPlans from './pages/BenefitPlans.jsx';
 import ThirteenthMonth from './pages/ThirteenthMonth.jsx';
@@ -34,6 +32,7 @@ import MyPayroll from './pages/portal/MyPayroll.jsx';
 import MyProfile from './pages/portal/MyProfile.jsx';
 import MyLeave from './pages/portal/MyLeave.jsx';
 import EmployeeSettings from './pages/portal/EmployeeSettings.jsx';
+import EmployeePending from './pages/portal/EmployeePending.jsx';
 
 function HomeGate() {
   const { user, ready } = useAuth();
@@ -49,7 +48,11 @@ function RequireHr() {
 
 function RequireEmployee() {
   const { user } = useAuth();
-  return user?.role === 'Employee' ? <Outlet /> : <Navigate to="/" replace />;
+  const location = useLocation();
+  if (user?.role !== 'Employee') return <Navigate to="/" replace />;
+  // Unlinked employee logins still get Settings; everything else waits for HR to attach the record.
+  if (!user.employee_id && !location.pathname.startsWith('/employee/settings')) return <EmployeePending />;
+  return <Outlet />;
 }
 
 export default function App() {
@@ -73,8 +76,6 @@ export default function App() {
           <Route path="payroll-run" element={<PayrollRun />} />
           <Route path="tax" element={<Tax />} />
           <Route path="claims" element={<Claims />} />
-          <Route path="claims/new" element={<LogClaim />} />
-          <Route path="claims/tracker" element={<ClaimTracker />} />
           <Route path="benefits" element={<Benefits />} />
           <Route path="benefit-plans" element={<BenefitPlans />} />
           <Route path="thirteenth-month" element={<ThirteenthMonth />} />

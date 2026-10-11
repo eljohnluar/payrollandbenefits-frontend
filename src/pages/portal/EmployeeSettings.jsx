@@ -20,8 +20,9 @@ function Row({ label, value }) {
 }
 
 function ProfileSection() {
-  const { data: profile, loading } = useResource('/api/me/profile');
+  const { data: profile, loading, error } = useResource('/api/me/profile');
   if (loading) return <Loading text="Loading profile…" />;
+  if (error) return <p className="settings-note">{error}</p>;
   const name = profile ? [profile.first_name, profile.middle_name, profile.last_name].filter(Boolean).join(' ') : '';
   return (
     <>

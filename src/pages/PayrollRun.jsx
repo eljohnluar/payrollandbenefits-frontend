@@ -685,6 +685,8 @@ export default function PayrollRun() {
           <h3 style={{ fontSize: 16, color: 'var(--text-main)', margin: '0 0 4px' }}>Finance Handoff Summary</h3>
           <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>
             Net pay grouped by e-wallet provider — export it for the Finance module, which performs the actual disbursement.
+            {' '}<strong>Reimbursements included in this run: {money(included.reduce((a, e) => a + num(e.claims_amount), 0))}</strong>
+            {' '}across {included.filter((e) => num(e.claims_amount) > 0).length} employee(s) (HR-approved claims).
           </p>
           <div className="grid-2" style={{ alignItems: 'start' }}>
             {disbursements.map(([prov, list]) => {
@@ -710,8 +712,8 @@ export default function PayrollRun() {
                       onClick={() =>
                         downloadCsv(
                           `disbursement-${prov.toLowerCase().replace(/\W+/g, '-')}-${run.id}.csv`,
-                          ['Employee ID', 'Name', 'Net Pay', 'Reference Status'],
-                          list.map((e) => [e.employee_id, e.employee_name, e.net_pay, e.status])
+                          ['Employee ID', 'Name', 'Reimbursements', 'Net Pay', 'Reference Status'],
+                          list.map((e) => [e.employee_id, e.employee_name, e.claims_amount, e.net_pay, e.status])
                         )
                       }
                     >

@@ -18,7 +18,6 @@ export default function Benefits() {
   const canDecideLeave = true;
   const year = String(new Date().getFullYear());
   const { data: employees } = useResource('/api/employees');
-  const { data: plans } = useResource('/api/benefit-plans');
   const { data: balances, loading: silLoading } = useResource(`/api/leave/balances${qs({ year })}`);
   const { data: leaveRequests, reload: reloadRequests } = useResource(`/api/leave/requests${qs({ year })}`);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -30,20 +29,8 @@ export default function Benefits() {
     '/api/benefits/enrollments',
     empFilter ? { employee_id: empFilter } : undefined
   );
-  const [enrolling, setEnrolling] = useState(false);
-  const [form, setForm] = useState({ employee_id: '', plan_id: '', effective_date: today(), dependents: 0 });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-
-  const selectedPlan = useMemo(
-    () => (plans || []).find((p) => String(p.id) === String(form.plan_id)) || null,
-    [plans, form.plan_id]
-  );
-  const previewEePct = selectedPlan ? (selectedPlan.employee_share ?? 100 - selectedPlan.employer_share) : 0;
-  const previewErPct = selectedPlan ? selectedPlan.employer_share : 0;
-  const previewPremium = selectedPlan ? Number(selectedPlan.monthly_premium || 0) : 0;
 
   // employee_id -> department, so the table can show the muted second line like the PHP page.
   const deptById = useMemo(() => {
@@ -62,27 +49,6 @@ export default function Benefits() {
       premium: active.reduce((sum, r) => sum + Number(r.monthly_premium || 0), 0),
     };
   }, [enrollments]);
-
-  function openEnroll() {
-    setForm({ employee_id: '', plan_id: '', effective_date: today(), dependents: 0 });
-    setEnrolling(true);
-  }
-  async function enroll(e) {
-    e.preventDefault();
-    setBusy(true); setNotice({ kind: 'info', msg: '' });
-    try {
-      await api.post('/api/benefits/enroll', {
-        employee_id: form.employee_id,
-        plan_id: Number(form.plan_id),
-        dependents: Number(form.dependents || 0),
-        effective_date: form.effective_date,
-      });
-      setNotice({ kind: 'success', msg: 'Employee enrolled.' });
-      setEnrolling(false);
-      reload();
-    } catch (err) { setNotice({ kind: 'error', msg: err.message }); }
-    finally { setBusy(false); }
-  }
 
   async function cancel(id) {
     if (!window.confirm('Cancel this enrollment?')) return;
@@ -171,17 +137,11 @@ export default function Benefits() {
     ) },
   ];
 
-  // Company policy (mirrored by the backend): Regular employees only.
-  const enrollable = (employees || []).filter(
-    (e) => (e.status === 'Active' || e.status === 'On Leave') && e.employment_type === 'Regular'
-  );
-
   return (
     <>
       <PageHeader
         title="Benefits Enrollment"
         subtitle="Manage employee health, insurance, and retirement plans"
-        right={<button className="btn btn-primary" onClick={openEnroll}>Enroll Employee</button>}
       />
 
       <div className="info-banner">
@@ -295,58 +255,6 @@ export default function Benefits() {
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
             <button type="button" className="btn ghost" onClick={() => setLeaveOpen(false)}>Cancel</button>
             <button className="btn btn-primary" disabled={busy}>{busy ? 'Filing…' : 'File Request'}</button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal open={enrolling} onClose={() => setEnrolling(false)} title="Enroll Employee to Benefit Plan">
-        <form onSubmit={enroll} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Notice kind="error">{busy ? '' : notice.kind === 'error' ? notice.msg : ''}</Notice>
-          <Field label="Employee">
-            <select className="form-control" value={form.employee_id} onChange={set('employee_id')} required>
-              <option value="">Select Employee</option>
-              {enrollable.map((emp) => (
-                <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} ({emp.code})</option>
-              ))}
-            </select>
-          </Field>
-          <div>
-            <Field label="Benefit Plan">
-              <select className="form-control" value={form.plan_id} onChange={set('plan_id')} required>
-                <option value="">Select Plan</option>
-                {(plans || []).map((p) => (
-                  <option key={p.id} value={p.id}>{p.plan_name} - {money(p.monthly_premium)}/mo</option>
-                ))}
-              </select>
-            </Field>
-            <div style={{ background: 'var(--surface-alt)', borderRadius: 6, padding: 12, fontSize: 12, marginTop: 10 }}>
-              <div className="form-grid-2" style={{ gap: 8, margin: 0 }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Employee Share: </span>
-                  <strong style={{ color: 'var(--danger)' }}>
-                    {previewEePct}% = {money(previewPremium * previewEePct / 100)}
-                  </strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Employer Share: </span>
-                  <strong style={{ color: 'var(--success)' }}>
-                    {previewErPct}% = {money(previewPremium * previewErPct / 100)}
-                  </strong>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="form-grid-2">
-            <Field label="Effective Date">
-              <input className="form-control" type="date" value={form.effective_date} onChange={set('effective_date')} required />
-            </Field>
-            <Field label="Dependents Enrolled">
-              <input className="form-control" type="number" min="0" value={form.dependents} onChange={set('dependents')} required />
-            </Field>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button type="button" className="btn ghost" onClick={() => setEnrolling(false)}>Cancel</button>
-            <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Submit Enrollment'}</button>
           </div>
         </form>
       </Modal>
