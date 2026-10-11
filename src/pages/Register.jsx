@@ -45,6 +45,7 @@ export default function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
+  const [employeeCode, setEmployeeCode] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [accountType, setAccountType] = useState('Employee');
   const [error, setError] = useState('');
@@ -118,7 +119,7 @@ export default function Register() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/confirm`,
-            data: { name: username, registration_code: registrationCode, account_type: accountType },
+            data: { name: username, registration_code: registrationCode, account_type: accountType, employee_code: employeeCode },
           },
         });
         if (sbError) throw new Error(sbError.message);
@@ -130,7 +131,7 @@ export default function Register() {
         setPassword('');
         return;
       }
-      await api.register({ email, username, password, registration_code: registrationCode, account_type: accountType });
+      await api.register({ email, username, password, registration_code: registrationCode, account_type: accountType, employee_code: employeeCode });
       setSuccess('Registration successful. You can now login with your email.');
       setPassword('');
       setRegistrationCode('');
@@ -152,7 +153,7 @@ export default function Register() {
           'Employee portal: attendance per cut-off, adjustments, claims, benefits, payroll summary',
           'HR Admin: full payroll, compensation, attendance and reporting workspace',
           'A registration code from the company is required',
-          'Employee sign-ups must use the company email on file, so the account links to your records',
+          'Employee sign-ups link to your records via the company email on file — or your employee code (e.g. EMP-2026-001) if you use a personal email',
         ],
         foot: 'Password resets are handled by the system administrator — there is no self-service reset.',
       }}
@@ -226,6 +227,19 @@ export default function Register() {
             <input id="registration_code" type="text" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} placeholder="Provided by the company" required />
           </div>
         </div>
+
+        {accountType === 'Employee' && (
+          <div className="login-field">
+            <label htmlFor="employee_code">Employee code <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional — if your email isn’t on file)</span></label>
+            <div className="input-wrap">
+              <span className="lead-icon"><Icon name="user" /></span>
+              <input id="employee_code" type="text" value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())} placeholder="e.g. EMP-2026-001" />
+            </div>
+            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+              Printed on your company ID or payslip. It links this login to your attendance, claims and pay records.
+            </span>
+          </div>
+        )}
 
         <div className="login-field terms-actions">
           <input

@@ -22,6 +22,7 @@ export default function AuthConfirm() {
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [accountType, setAccountType] = useState('HR');
+  const [employeeCode, setEmployeeCode] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -97,6 +98,7 @@ export default function AuthConfirm() {
       registration_code: code,
       password,
       account_type: accountType,
+      employee_code: accountType === 'Employee' ? employeeCode : '',
     });
     setBusy(false);
     if (s === 200) {
@@ -138,9 +140,21 @@ export default function AuthConfirm() {
                   </button>
                 </div>
                 {accountType === 'Employee' && (
-                  <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '6px 0 0' }}>
-                    Use the same email HR has on file for you in the employee records.
-                  </p>
+                  <>
+                    <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '6px 0 0' }}>
+                      Use the same email HR has on file for you — or enter your employee code below.
+                    </p>
+                    <div style={{ marginTop: 10 }}>
+                      <label htmlFor="confirm-emp-code">Employee code (if your email isn’t on file)</label>
+                      <input
+                        id="confirm-emp-code"
+                        type="text"
+                        value={employeeCode}
+                        onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. EMP-2026-001"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
               {needsCode && (
