@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api/client.js';
 import { money, shortDate } from '../lib/format.js';
 import { useRealtime } from '../hooks/useRealtime.js';
-import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice, Modal, Field } from '../components/ui.jsx';
 
 const RANGES = { '30d': '30 Days', '3m': '3 Months', '1y': '1 Year' };
 const RANGE_MODIFY = { '30d': -30, '3m': -3, '1y': -12 };
@@ -24,10 +24,19 @@ const fmtCompact = (v) => {
   return `₱${Math.round(v)}`;
 };
 
-const isoPlusDays = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const toIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// Semi-monthly payday: the 15th or month-end, never a Sunday — moved to the day before.
+const offSunday = (iso) => {
+  const d = new Date(`${iso}T12:00:00`);
+  while (d.getDay() === 0) d.setDate(d.getDate() - 1);
+  return toIso(d);
+};
+
+const cutoffRange = (month, half) => {
+  const [y, m] = month.split('-').map(Number);
+  const pad = (day) => `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return half === 'first' ? { start: pad(1), end: pad(15) } : { start: pad(16), end: pad(new Date(y, m, 0).getDate()) };
 };
 
 const monthOfEnd = (iso) => {
@@ -312,6 +321,9 @@ export default function PayrollRun() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
+  const [newOpen, setNewOpen] = useState(false);
+  const [newMonth, setNewMonth] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`; });
+  const [newHalf, setNewHalf] = useState(() => (new Date().getDate() <= 15 ? 'first' : 'second'));
 
   const loadTrend = useCallback(async (r) => {
     try {
@@ -334,7 +346,7 @@ export default function PayrollRun() {
       const r = await api.get(`/api/payroll/runs/${id}`);
       setRun(r);
       setRunId(r.id);
-      setPayDate(r.pay_date || isoPlusDays(5));
+      setPayDate(r.pay_date || offSunday(r.period_end));
       setExpanded({});
     } catch (e) {
       setError(e.message);
@@ -354,7 +366,7 @@ export default function PayrollRun() {
         loadTrend(range);
         if (list.length) {
           const currentPeriod = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-          const match = list.find((r) => r.period === currentPeriod) || list[0];
+          const match = list.find((r) => r.period.startsWith(currentPeriod)) || list[0];
           await loadRun(match.id);
         }
       } catch (e) {
@@ -446,6 +458,24 @@ export default function PayrollRun() {
     );
   }
 
+  async function createCutoffRun() {
+    const { start, end } = cutoffRange(newMonth, newHalf);
+    setBusy('newrun');
+    setError('');
+    setNotice('');
+    try {
+      const res = await api.post('/api/payroll/process', { period_start: start, period_end: end, compute: false });
+      const created = res?.data ?? res;
+      setNewOpen(false);
+      await loadRun(created.id);
+      setNotice(`${created.period} created — payday ${shortDate(created.pay_date)}. Click Recompute to calculate pay.`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
+
   const disbursements = useMemo(() => {
     const groups = {};
     included.forEach((it) => {
@@ -484,6 +514,7 @@ export default function PayrollRun() {
             </option>
           ))}
         </select>
+        <button className="btn btn-primary" onClick={() => setNewOpen(true)}>＋ New Cut-off Run</button>
       </div>
 
       <ErrorBox error={error} />
@@ -726,6 +757,41 @@ export default function PayrollRun() {
           </div>
         </>
       )}
+
+      <Modal open={newOpen} onClose={() => setNewOpen(false)} title="New Semi-Monthly Payroll Run">
+        <form onSubmit={(e) => { e.preventDefault(); createCutoffRun(); }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="form-grid-2">
+            <Field label="Month">
+              <input type="month" className="form-control" value={newMonth} onChange={(e) => setNewMonth(e.target.value)} required />
+            </Field>
+            <Field label="Cut-off">
+              <select className="form-control" value={newHalf} onChange={(e) => setNewHalf(e.target.value)}>
+                <option value="first">1st – 15th (First Half)</option>
+                <option value="second">16th – End of month (Second Half)</option>
+              </select>
+            </Field>
+          </div>
+          {newMonth.includes('-') && (() => {
+            const { start, end } = cutoffRange(newMonth, newHalf);
+            const payday = offSunday(end);
+            return (
+              <div style={{ background: 'var(--surface-alt)', padding: 10, borderRadius: 'var(--radius)', fontSize: 13 }}>
+                <div>Cover period: <strong>{shortDate(start)} – {shortDate(end)}</strong></div>
+                <div style={{ marginTop: 4 }}>
+                  Payday: <strong>{shortDate(payday)}</strong>
+                  {payday !== end && (
+                    <span style={{ color: 'var(--text-muted)' }}> — falls on a Sunday, so pay moves to the preceding workday</span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button type="button" className="btn ghost" onClick={() => setNewOpen(false)}>Cancel</button>
+            <button className="btn btn-primary" disabled={!!busy}>{busy === 'newrun' ? 'Creating…' : 'Create Run'}</button>
+          </div>
+        </form>
+      </Modal>
     </>
   );
 }

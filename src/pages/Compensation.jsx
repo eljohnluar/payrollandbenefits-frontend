@@ -287,7 +287,7 @@ export default function Compensation() {
   }
 
   // Rate math mirrors compensation.php but honours system settings (defaults 22 / 8).
-  const workDays = Number(settings?.work_days_per_month) || 22;
+  const workDays = Number(settings?.work_days_per_month) || 15;
   const workHours = Number(settings?.work_hours_per_day) || 8;
   const basic = Number(profile?.basic_salary) || 0;
   const dailyRate = basic / workDays;
