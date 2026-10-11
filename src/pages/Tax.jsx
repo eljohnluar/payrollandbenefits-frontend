@@ -57,6 +57,15 @@ export default function Tax() {
     money(sum('withholding_tax')),
   ];
 
+  const basisRows = [];
+  items.forEach((i) => {
+    if (!i.statutory_basis) return;
+    try {
+      const b = JSON.parse(i.statutory_basis);
+      ['sss', 'philhealth', 'pagibig'].forEach((k) => basisRows.push({ employee_name: i.employee_name, ...b[k] }));
+    } catch { /* row computed before the basis snapshot existed */ }
+  });
+
   return (
     <>
       <PageHeader
@@ -101,6 +110,21 @@ export default function Tax() {
 
           <Card title={`Contributions — ${run.period}`}>
             <DataTable columns={columns} rows={items} foot={foot} empty="No computed lines yet. Run payroll first." />
+          </Card>
+
+          <Card title="Deduction Basis — bracket & rate applied per employee" right={<span className="badge badge-muted">Recompute the run to refresh</span>}>
+            <DataTable
+              columns={[
+                { key: 'employee_name', label: 'Employee' },
+                { key: 'agency', label: 'Agency', render: (r) => <strong>{r.agency}</strong> },
+                { key: 'bracket', label: 'Salary Bracket Used', render: (r) => <span style={{ fontSize: 12 }}>{r.bracket}</span> },
+                { key: 'ee_basis', label: 'Employee Basis', render: (r) => <span style={{ fontSize: 12 }}>{r.ee_basis}</span> },
+                { key: 'ee_share', label: 'Employee Share', align: 'right', render: (r) => money(r.ee_share) },
+                { key: 'er_share', label: 'Employer Share', align: 'right', render: (r) => money(r.er_share) },
+              ]}
+              rows={basisRows}
+              empty="No basis captured yet — recompute this payroll run to store the bracket and rate evidence."
+            />
           </Card>
 
           <Card title="Rate Reference (2026 Policy)" right={<span className="badge badge-muted">2026</span>}>

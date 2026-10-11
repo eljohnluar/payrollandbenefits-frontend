@@ -1,118 +1,202 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useResource } from '../hooks/useResource.js';
-import { qs } from '../api/client.js';
+import { api, qs } from '../api/client.js';
 import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge } from '../components/ui.jsx';
 
-const isoToday = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-};
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const isoMonth = () => isoToday().slice(0, 7);
+const pad = (n) => String(n).padStart(2, '0');
 
-const STATUS_MAP = {
-  P: { cls: 'badge-success', label: 'Present' },
-  H: { cls: 'badge-info', label: 'Holiday' },
-  A: { cls: 'badge-danger', label: 'Absent' },
-  OT: { cls: 'badge-primary', label: 'Overtime' },
-  L: { cls: 'badge-warning', label: 'Late' },
+/** Cut-off periods are 1st–15th and 16th–end of month. */
+function cutoffWindow(month, half) {
+  const [y, m] = String(month).split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return half === 'first'
+    ? { start: `${y}-${pad(m)}-01`, end: `${y}-${pad(m)}-15` }
+    : { start: `${y}-${pad(m)}-16`, end: `${y}-${pad(m)}-${pad(lastDay)}` };
+}
+
+const periodLabel = (month, half) => {
+  const [y, m] = String(month).split('-').map(Number);
+  const name = m ? MONTH_LABELS[m - 1] : month;
+  return `${name} ${y} — cut-off ${half === 'first' ? '1st–15th' : '16th–month end'}`;
 };
 
 function Pill({ cls, children }) {
   return <span className={`badge ${cls}`}>{children}</span>;
 }
 
-function StatusPill({ status }) {
-  const s = STATUS_MAP[status];
-  return s ? <Pill cls={s.cls}>{s.label}</Pill> : <Pill cls="badge-muted">Not Logged</Pill>;
-}
-
-function ShiftPill({ name }) {
-  if (!name) return <span style={{ color: 'var(--text-muted)' }}>—</span>;
-  const cls = { Night: 'badge-primary', Mid: 'badge-warning', Holiday: 'badge-danger', 'Rest Day': 'badge-muted' }[name] || 'badge-info';
-  return <Pill cls={cls}>{name}</Pill>;
-}
-
 const hrs = (v) => (v == null || v === '' ? '—' : `${Number(v).toFixed(1)} h`);
 
-const empCell = (r) => (
-  <div>
-    <div style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</div>
-    {r.department && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.department}</div>}
-  </div>
-);
+/* ── Tab 1: Cut-off Records (HR enters P/H/A/OT totals per period) ── */
+function CutoffTab({ month, half }) {
+  const { start, end } = useMemo(() => cutoffWindow(month, half), [month, half]);
+  const { data, loading, error, reload } = useResource(`/api/attendance/cutoffs${qs({ cutoff_start: start, cutoff_end: end })}`);
+  const [drafts, setDrafts] = useState({});
+  const [saving, setSaving] = useState('');
+  const [feedback, setFeedback] = useState('');
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const monthLabel = (ym) => {
-  const [y, m] = String(ym).split('-').map(Number);
-  return y && m ? `${MONTH_LABELS[m - 1]} ${y}` : ym;
-};
-
-/* ── Tab 1: Daily Record ── */
-function DailyTab({ date }) {
-  const { data, loading, error } = useResource(`/api/attendance/daily${qs({ date })}`);
   const rows = data || [];
-  const present = rows.filter((r) => r.status === 'P' || r.status === 'OT').length;
-  const absent = rows.filter((r) => r.status === 'A').length;
-  const onOt = rows.filter((r) => r.status === 'OT').length;
+  useEffect(() => setDrafts({}), [start, end]);
+
+  const draftFor = (r) => drafts[r.employee_id] || {
+    present_days: r.present_days ?? 0,
+    half_days: r.half_days ?? 0,
+    absent_days: r.absent_days ?? 0,
+    ot_days: r.ot_days ?? 0,
+    ot_hours: r.ot_hours ?? 0,
+    remarks: r.remarks ?? '',
+  };
+
+  const patch = (r, field, value) => setDrafts((d) => ({ ...d, [r.employee_id]: { ...draftFor(r), [field]: value } }));
+
+  async function save(r) {
+    setSaving(r.employee_id);
+    setFeedback('');
+    try {
+      await api.post('/api/attendance/cutoffs', {
+        employee_id: r.employee_id,
+        cutoff_start: start,
+        cutoff_end: end,
+        ...draftFor(r),
+      });
+      reload();
+    } catch (e) {
+      setFeedback(e.message);
+    } finally {
+      setSaving('');
+    }
+  }
+
+  const num = (v) => (v == null || v === '' ? 0 : Number(v) || 0);
+  const totalWorked = rows.reduce((a, r) => { const d = draftFor(r); return a + num(d.present_days) + num(d.ot_days) + num(d.half_days) * 0.5; }, 0);
+  const totalAbsent = rows.reduce((a, r) => a + num(draftFor(r).absent_days), 0);
+  const totalOt = rows.reduce((a, r) => a + num(draftFor(r).ot_hours), 0);
+
+  const cell = (r, field, { min = 0, step = 1 } = {}) => (
+    <input
+      type="number"
+      className="form-control cutoff-input"
+      min={min}
+      step={step}
+      value={draftFor(r)[field]}
+      onChange={(e) => patch(r, field, e.target.value)}
+    />
+  );
 
   return (
     <>
       <StatsGrid>
-        <Stat label="Total Employees" value={rows.length} />
-        <Stat label="Present (inc. OT)" value={<span style={{ color: 'var(--success)' }}>{present}</span>} kind="positive" />
-        <Stat label="Absences" value={<span style={{ color: 'var(--danger)' }}>{absent}</span>} kind="negative" />
-        <Stat label="On Overtime" value={<span style={{ color: 'var(--primary)' }}>{onOt}</span>} kind="primary" />
+        <Stat label="Employees" value={rows.length} />
+        <Stat label="Total Days Worked" value={<span style={{ color: 'var(--success)' }}>{totalWorked}</span>} sub="Present + OT + ½ × Half-days" kind="positive" />
+        <Stat label="Total Absences" value={<span style={{ color: 'var(--danger)' }}>{totalAbsent}</span>} kind="negative" />
+        <Stat label="Total OT Hours" value={<span style={{ color: 'var(--primary)' }}>{totalOt.toFixed(1)} h</span>} kind="primary" />
       </StatsGrid>
-      <Card body>
+
+      {feedback && <div className="alert error">{feedback}</div>}
+
+      <Card body title={`Cut-off Attendance — ${periodLabel(month, half)}`}>
         <DataTable
           loading={loading} error={error}
           columns={[
-            { key: 'employee', label: 'Employee', render: empCell },
-            { key: 'shift', label: 'Shift', render: (r) => <ShiftPill name={r.shift_name} /> },
-            { key: 'status', label: 'Status', render: (r) => <StatusPill status={r.status} /> },
-            { key: 'late_minutes', label: 'Late', align: 'right', render: (r) => (Number(r.late_minutes) > 0 ? `${Number(r.late_minutes).toFixed(0)} min` : '—') },
-            { key: 'actual_hours', label: 'Actual Hours', align: 'right', render: (r) => hrs(r.actual_hours) },
-            { key: 'ot_hours', label: 'OT Hours', align: 'right', render: (r) => hrs(r.ot_hours) },
-            { key: 'timesheet_status', label: 'Timesheet', render: (r) => (r.timesheet_status ? <Badge>{r.timesheet_status}</Badge> : <span style={{ color: 'var(--text-muted)' }}>—</span>) },
+            { key: 'employee', label: 'Employee', render: (r) => (
+              <div>
+                <div style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.department} · {r.position}</div>
+              </div>
+            ) },
+            { key: 'status', label: 'Recorded', render: (r) => (r.recorded ? <Pill cls="badge-success">Recorded</Pill> : <Pill cls="badge-muted">Not recorded</Pill>) },
+            { key: 'present_days', label: 'P (days)', render: (r) => cell(r, 'present_days') },
+            { key: 'half_days', label: 'H (days)', render: (r) => cell(r, 'half_days') },
+            { key: 'absent_days', label: 'A (days)', render: (r) => cell(r, 'absent_days') },
+            { key: 'ot_days', label: 'OT (days)', render: (r) => cell(r, 'ot_days') },
+            { key: 'ot_hours', label: 'OT Hours', render: (r) => cell(r, 'ot_hours', { step: 0.5 }) },
+            { key: 'days_worked', label: 'Days Worked', align: 'right', render: (r) => { const d = draftFor(r); return <strong>{num(d.present_days) + num(d.ot_days) + num(d.half_days) * 0.5}</strong>; } },
+            { key: 'save', label: '', render: (r) => (
+              <button className="btn small" onClick={() => save(r)} disabled={saving === r.employee_id}>
+                {saving === r.employee_id ? 'Saving…' : 'Save'}
+              </button>
+            ) },
           ]}
-          rows={rows} empty="No attendance records for this date."
+          rows={rows} empty="No active employees to record for this cut-off."
         />
       </Card>
     </>
   );
 }
 
-/* ── Tab 2: Monthly Summary ── */
-function SummaryTab({ month }) {
-  const { data, loading, error } = useResource(`/api/attendance/summary${qs({ month })}`);
+/* ── Tab 2: Adjustment requests from off-site / field workers ── */
+function AdjustmentsTab() {
+  const { data, loading, error, reload } = useResource('/api/attendance/adjustments');
+  const [busy, setBusy] = useState('');
+  const [feedback, setFeedback] = useState('');
   const rows = data || [];
-  const sum = (key) => rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
+  const pending = rows.filter((r) => r.status === 'Pending').length;
+
+  async function decide(r, status) {
+    setBusy(`${r.id}-${status}`);
+    setFeedback('');
+    try {
+      await api.post(`/api/attendance/adjustments/${r.id}/decision`, { status, notes: '' });
+      reload();
+    } catch (e) {
+      setFeedback(e.message);
+    } finally {
+      setBusy('');
+    }
+  }
 
   return (
-    <Card body>
-      <DataTable
-        loading={loading} error={error}
-        columns={[
-          { key: 'employee', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</span> },
-          { key: 'department', label: 'Department' },
-          { key: 'present_days', label: 'Present', render: (r) => <Pill cls="badge-success">{r.present_days ?? 0}</Pill> },
-          { key: 'holiday_days', label: 'Holiday', render: (r) => <Pill cls="badge-info">{r.holiday_days ?? 0}</Pill> },
-          { key: 'absent_days', label: 'Absent', render: (r) => <Pill cls="badge-danger">{r.absent_days ?? 0}</Pill> },
-          { key: 'ot_days', label: 'OT Days', render: (r) => <Pill cls="badge-primary">{r.ot_days ?? 0}</Pill> },
-          { key: 'late_days', label: 'Late Days', render: (r) => <Pill cls="badge-warning">{r.late_days ?? 0}</Pill> },
-          { key: 'late_minutes', label: 'Late (min)', align: 'right', render: (r) => (Number(r.late_minutes) > 0 ? Number(r.late_minutes).toFixed(0) : '—') },
-          { key: 'ot_hours', label: 'OT Hours', align: 'right', render: (r) => hrs(r.ot_hours) },
-          { key: 'total_hours', label: 'Total Hours', align: 'right', render: (r) => hrs(r.total_hours) },
-          { key: 'days_recorded', label: 'Days Recorded', align: 'right' },
-          { key: 'timesheet_status', label: 'Timesheet', render: (r) => (r.timesheet_status ? <Badge>{r.timesheet_status}</Badge> : <span style={{ color: 'var(--text-muted)' }}>—</span>) },
-        ]}
-        rows={rows} empty="No attendance records for this month."
-        foot={['Total', '', sum('present_days'), sum('holiday_days'), sum('absent_days'), sum('ot_days'),
-          sum('late_days'), sum('late_minutes').toFixed(0),
-          `${sum('ot_hours').toFixed(1)} h`, `${sum('total_hours').toFixed(1)} h`, sum('days_recorded'), '']}
-      />
-    </Card>
+    <>
+      <StatsGrid>
+        <Stat label="Requests" value={rows.length} />
+        <Stat label="Awaiting Review" value={<span style={{ color: 'var(--warning, #d97706)' }}>{pending}</span>} kind="neutral" />
+        <Stat label="Approved" value={<span style={{ color: 'var(--success)' }}>{rows.filter((r) => r.status === 'Approved').length}</span>} kind="positive" />
+        <Stat label="Rejected" value={<span style={{ color: 'var(--danger)' }}>{rows.filter((r) => r.status === 'Rejected').length}</span>} kind="negative" />
+      </StatsGrid>
+
+      {feedback && <div className="alert error">{feedback}</div>}
+
+      <Card body title="Attendance Adjustments">
+        <DataTable
+          loading={loading} error={error}
+          columns={[
+            { key: 'employee', label: 'Employee', render: (r) => (
+              <div>
+                <div style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.department} · filed by {r.requested_by}</div>
+              </div>
+            ) },
+            { key: 'cutoff', label: 'Cut-off', render: (r) => `${r.cutoff_start} → ${r.cutoff_end}` },
+            { key: 'details', label: 'Details', render: (r) => (
+              <div style={{ maxWidth: 320 }}>
+                <div>{r.details}</div>
+                {r.location && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Where: {r.location}</div>}
+              </div>
+            ) },
+            { key: 'adjust', label: 'Requested', render: (r) => (
+              <div style={{ fontSize: 12 }}>
+                {Number(r.add_present_days) > 0 && <Pill cls="badge-success">+{r.add_present_days} P</Pill>}{' '}
+                {Number(r.add_half_days) > 0 && <Pill cls="badge-info">+{r.add_half_days} H</Pill>}{' '}
+                {Number(r.remove_absent_days) > 0 && <Pill cls="badge-danger">−{r.remove_absent_days} A</Pill>}{' '}
+                {Number(r.add_ot_hours) > 0 && <Pill cls="badge-primary">+{hrs(r.add_ot_hours)}</Pill>}{' '}
+                {!Number(r.add_present_days) && !Number(r.add_half_days) && !Number(r.remove_absent_days) && !Number(r.add_ot_hours) && <span style={{ color: 'var(--text-muted)' }}>Details only</span>}
+              </div>
+            ) },
+            { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
+            { key: 'actions', label: '', render: (r) => (r.status === 'Pending' ? (
+              <span style={{ display: 'inline-flex', gap: 6 }}>
+                <button className="btn small" onClick={() => decide(r, 'Approved')} disabled={busy.startsWith(String(r.id))}>Approve</button>
+                <button className="btn ghost small" onClick={() => decide(r, 'Rejected')} disabled={busy.startsWith(String(r.id))}>Reject</button>
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString() : ''}</span>
+            )) },
+          ]}
+          rows={rows} empty="No adjustment requests yet. Off-site workers can file them from their portal."
+        />
+      </Card>
+    </>
   );
 }
 
@@ -177,26 +261,28 @@ function LeaveTab({ year }) {
 
 /* ── Page ── */
 const TABS = [
-  { key: 'daily', label: 'Daily Record' },
-  { key: 'monthly', label: 'Monthly Summary' },
+  { key: 'cutoff', label: 'Cut-off Records' },
+  { key: 'adjustments', label: 'Adjustments' },
   { key: 'leave', label: 'Leave Balance' },
 ];
 
 export default function Attendance() {
-  const [tab, setTab] = useState('daily');
-  const [date, setDate] = useState('2026-09-26'); // demo default: last fully seeded attendance day
-  const [month, setMonth] = useState(isoMonth());
+  const [tab, setTab] = useState('cutoff');
+  const [month, setMonth] = useState('2026-09'); // demo default: seeded attendance month
+  const [half, setHalf] = useState('second');
   const [year, setYear] = useState(String(new Date().getFullYear()));
 
   return (
     <>
-      <PageHeader title="Attendance" subtitle="Read-only attendance and leave view consumed by payroll." />
+      <PageHeader title="Attendance" subtitle="Recorded per cut-off period (1st–15th / 16th–month end) — the basis for payroll computation." />
 
       <div className="info-banner">
         <span>ℹ</span>
         <span>
-          Attendance changes are managed in the Time and Attendance System.
-          Late and absent records are <strong>automatically deducted in payroll</strong> (late minutes at the hourly rate; absences unpaid at the daily rate).
+          Attendance is no longer logged day by day. HR enters the P / H / A / OT totals for each cut-off period;
+          total days worked, absences and OT hours then feed payroll. Absences stay unpaid and lateness is
+          deducted at the hourly rate. Off-site drivers and field staff can file <strong>adjustments</strong>, which
+          update the cut-off record once HR approves them.
         </span>
       </div>
 
@@ -207,28 +293,25 @@ export default function Attendance() {
             className={tab === t.key ? 'active' : undefined}
             onClick={() => setTab(t.key)}
           >
-            {t.key === 'monthly' ? `Monthly Summary (${monthLabel(month)})` : t.label}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'daily' && (
-        <>
-          <div className="filters-bar">
-            <input type="date" className="form-control" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <DailyTab date={date} />
-        </>
-      )}
-
-      {tab === 'monthly' && (
+      {tab === 'cutoff' && (
         <>
           <div className="filters-bar">
             <input type="month" className="form-control" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <span className="seg" style={{ display: 'inline-flex', gap: 6 }}>
+              <button className={`btn small${half === 'first' ? '' : ' ghost'}`} onClick={() => setHalf('first')}>1st – 15th</button>
+              <button className={`btn small${half === 'second' ? '' : ' ghost'}`} onClick={() => setHalf('second')}>16th – month end</button>
+            </span>
           </div>
-          <SummaryTab month={month} />
+          <CutoffTab month={month} half={half} />
         </>
       )}
+
+      {tab === 'adjustments' && <AdjustmentsTab />}
 
       {tab === 'leave' && (
         <>

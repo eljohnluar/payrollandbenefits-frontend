@@ -8,8 +8,8 @@ import { useAuth } from '../auth/AuthContext.jsx';
 /**
  * Landing page for Supabase email-confirmation links and OTP/redirect flows.
  * Waits for the Supabase session, then exchanges it for an app JWT. First-time
- * users are asked for their registration code (and an app password used by the
- * payslip gate) before their account is provisioned.
+ * users are asked for their registration code (and an app password used for
+ * password-confirmed actions) before their account is provisioned.
  */
 export default function AuthConfirm() {
   const { user, adoptSession } = useAuth();
@@ -21,6 +21,7 @@ export default function AuthConfirm() {
   const [message, setMessage] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
+  const [accountType, setAccountType] = useState('HR');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -37,10 +38,16 @@ export default function AuthConfirm() {
       handled.current = true;
       sessionFound = true;
       setSession(sessionOrNull);
+      try {
+        const b64 = sessionOrNull.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const claims = JSON.parse(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)));
+        const at = claims.user_metadata?.account_type;
+        if (at === 'Employee' || at === 'HR') setAccountType(at);
+      } catch { /* token claims are best-effort prefill only */ }
       const { status: s, payload } = await api.supabaseLogin(sessionOrNull.access_token);
       if (s === 200) {
-        adoptSession(payload);
-        navigate('/', { replace: true });
+        const sessionUser = adoptSession(payload);
+        navigate(sessionUser?.role === 'Employee' ? '/employee' : '/', { replace: true });
         return;
       }
       handled.current = false; // allow the activation form to retry
@@ -74,7 +81,7 @@ export default function AuthConfirm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={user.role === 'Employee' ? '/employee' : '/'} replace />;
 
   async function activate(event) {
     event.preventDefault();
@@ -89,11 +96,12 @@ export default function AuthConfirm() {
     const { status: s, payload } = await api.supabaseLogin(session.access_token, {
       registration_code: code,
       password,
+      account_type: accountType,
     });
     setBusy(false);
     if (s === 200) {
-      adoptSession(payload);
-      navigate('/', { replace: true });
+      const sessionUser = adoptSession(payload);
+      navigate(sessionUser?.role === 'Employee' ? '/employee' : '/', { replace: true });
       return;
     }
     setStatus('error');
@@ -119,6 +127,22 @@ export default function AuthConfirm() {
           )}
           {status === 'needs_activation' && (
             <>
+              <div className="field">
+                <label>Account type</label>
+                <div className="acct-seg">
+                  <button type="button" className={accountType === 'Employee' ? 'active' : ''} onClick={() => setAccountType('Employee')}>
+                    👤 Employee
+                  </button>
+                  <button type="button" className={accountType === 'HR' ? 'active' : ''} onClick={() => setAccountType('HR')}>
+                    🛠 HR Admin
+                  </button>
+                </div>
+                {accountType === 'Employee' && (
+                  <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '6px 0 0' }}>
+                    Use the same email HR has on file for you in the employee records.
+                  </p>
+                )}
+              </div>
               {needsCode && (
                 <div className="field">
                   <label htmlFor="confirm-code">Registration code</label>
@@ -140,7 +164,7 @@ export default function AuthConfirm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
-                  placeholder="Used for payslip print/download"
+                  placeholder="Used for password-confirmed actions"
                   required
                 />
               </div>

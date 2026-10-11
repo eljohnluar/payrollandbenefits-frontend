@@ -29,8 +29,8 @@ export default function Terms() {
           <h2>2. Authorized use</h2>
           <ul>
             <li>Accounts are issued to authorized personnel of the company only and are personal and non-transferable.</li>
-            <li>You must not share your login credentials, verification codes, or payslip password with anyone.</li>
-            <li>New accounts are provisioned with the HR role using a registration code issued by the company; misuse of a code may lead to account suspension.</li>
+            <li>You must not share your login credentials or verification codes with anyone.</li>
+            <li>New HR Admin accounts are provisioned with a registration code issued by the company; employee logins are created by HR Admin. Misuse of a code may lead to account suspension. There is no self-service password reset — forgotten passwords are reset by the system administrator.</li>
           </ul>
 
           <h2>3. Confidentiality of payroll and personal data</h2>
@@ -44,7 +44,7 @@ export default function Terms() {
           <ul>
             <li>Password login requires a one-time code sent to your registered email; treat that email as part of your credentials.</li>
             <li>The System automatically signs you out after a period of inactivity to protect open sessions.</li>
-            <li>Printing or downloading a payslip requires re-entering your payslip password. You are responsible for every action taken under your credentials.</li>
+            <li>Payslips are issued through the Finance system; sensitive actions inside the System (such as Settings changes) require re-entering your password. You are responsible for every action taken under your credentials.</li>
             <li>You must report suspected account compromise to your system administrator immediately.</li>
           </ul>
 

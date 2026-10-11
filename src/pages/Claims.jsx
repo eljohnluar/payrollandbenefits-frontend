@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money } from '../components/ui.jsx';
 
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'Paid'];
@@ -47,10 +46,8 @@ function ReceiptOcrPanel({ detail }) {
 }
 
 export default function Claims() {
-  const { user } = useAuth();
-  const role = String(user?.role || '');
-  const canReview = role === 'Admin' || role === 'HR';
-  const canDisburse = role === 'Admin' || role === 'Finance';
+  // Only HR Admin reaches this page now; payment itself is executed in the Finance module.
+  const canReview = true;
   const [status, setStatus] = useState('');
   const { data, loading, error, reload } = useResource('/api/claims');
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
@@ -77,19 +74,7 @@ export default function Claims() {
   async function decide(id, next) {
     try {
       const updated = await api.post(`/api/claims/${id}/decision`, { status: next });
-      setNotice({ kind: 'success', msg: `Claim marked ${next}.${next === 'Approved' ? ' Finance can now disburse it.' : ''}` });
-      setDetail(updated?.data ?? updated);
-      reload();
-    } catch (e) {
-      setNotice({ kind: 'error', msg: e.message });
-    }
-  }
-
-  async function disburse(id) {
-    if (!window.confirm('Finance disbursement approval: release this reimbursement to the employee?')) return;
-    try {
-      const updated = await api.post(`/api/claims/${id}/disburse`, {});
-      setNotice({ kind: 'success', msg: 'Claim approved and disbursed by Finance — marked Paid.' });
+      setNotice({ kind: 'success', msg: `Claim marked ${next}.${next === 'Approved' ? ' Payment is handled by the external Finance module.' : ''}` });
       setDetail(updated?.data ?? updated);
       reload();
     } catch (e) {
@@ -163,21 +148,11 @@ export default function Claims() {
                   <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => decide(detail.id, 'Rejected')}>Reject</button>
                 </div>
               )}
-              {detail.status === 'Pending' && !canReview && (
-                <div style={{ ...{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }, fontSize: 12, color: 'var(--text-muted)' }}>
-                  Awaiting HR review.
-                </div>
-              )}
               {detail.status === 'Approved' && (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                    Approved — requires Finance disbursement before payment.
+                    Approved — reimbursement payment is processed by the external Finance module.
                   </div>
-                  {canDisburse && (
-                    <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => disburse(detail.id)}>
-                      Approve Disbursement (Finance)
-                    </button>
-                  )}
                 </div>
               )}
               {detail.status === 'Paid' && detail.disbursed_at && (

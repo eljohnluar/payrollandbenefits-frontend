@@ -4,6 +4,7 @@ import { api } from '../api/client.js';
 import { supabase } from '../lib/supabase.js';
 import { PASSWORD_RULES, passwordProblem } from '../lib/password.js';
 import { GoogleG } from '../components/GoogleIcon.jsx';
+import AuthShell from '../components/AuthShell.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const ICONS = {
@@ -45,6 +46,7 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [registrationCode, setRegistrationCode] = useState('');
   const [showPw, setShowPw] = useState(false);
+  const [accountType, setAccountType] = useState('Employee');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
@@ -116,7 +118,7 @@ export default function Register() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/confirm`,
-            data: { name: username, registration_code: registrationCode },
+            data: { name: username, registration_code: registrationCode, account_type: accountType },
           },
         });
         if (sbError) throw new Error(sbError.message);
@@ -128,7 +130,7 @@ export default function Register() {
         setPassword('');
         return;
       }
-      await api.register({ email, username, password, registration_code: registrationCode });
+      await api.register({ email, username, password, registration_code: registrationCode, account_type: accountType });
       setSuccess('Registration successful. You can now login with your email.');
       setPassword('');
       setRegistrationCode('');
@@ -141,97 +143,123 @@ export default function Register() {
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        <div className="login-hero">
-          <div className="login-logo"><img src="/logo.jpg" alt="Company logo" /></div>
-          {company && <div className="brand-company">{company}</div>}
-          <h1>Payroll Management System</h1>
-          <p>Create your account — join with an HR registration code</p>
-        </div>
-        <form className="login-body" onSubmit={submit}>
-          {error && <div className="alert error">{error}</div>}
-          {success && <div className="alert success">{success}</div>}
-
-          <div className="login-field">
-            <label htmlFor="email">Email address</label>
-            <div className="input-wrap">
-              <span className="lead-icon"><Icon name="mail" /></span>
-              <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="username" required />
-            </div>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="username">Display name</label>
-            <div className="input-wrap">
-              <span className="lead-icon"><Icon name="user" /></span>
-              <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Juan Dela Cruz" autoComplete="name" required />
-            </div>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="password">Password</label>
-            <div className="input-wrap">
-              <span className="lead-icon"><Icon name="lock" /></span>
-              <input id="password" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="Strong password required" required />
-              <button type="button" className="eye-btn" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((v) => !v)}>
-                <EyeIcon off={showPw} />
-              </button>
-            </div>
-            <ul className="pw-checks" aria-label="Password requirements">
-              {PASSWORD_RULES.map((rule) => {
-                const ok = rule.test(password);
-                return (
-                  <li key={rule.id} className={ok ? 'ok' : ''}>
-                    <span className="dot">{ok ? '✓' : '○'}</span> {rule.label}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="registration_code">Registration code</label>
-            <div className="input-wrap">
-              <span className="lead-icon"><Icon name="key" /></span>
-              <input id="registration_code" type="text" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} placeholder="Provided by HR" required />
-            </div>
-          </div>
-
-          <div className="login-field terms-actions">
-            <input
-              id="terms-agree"
-              type="checkbox"
-              checked={agreed}
-              onChange={(e) => { setAgreed(e.target.checked); setError(''); }}
-            />
-            <label htmlFor="terms-agree">
-              I have read and agree to the{' '}
-              <Link to="/terms" target="_blank" rel="noreferrer">Terms and Conditions</Link>
-              {' '}of the Payroll Management System.
-            </label>
-          </div>
-
-          <button type="submit" className="btn-block" disabled={busy}>
-            {busy ? 'Creating account…' : 'Register'}
-          </button>
-
-          {supabase && (
-            <div className="otp-block">
-              <div className="otp-divider"><span>or</span></div>
-              <button type="button" className="btn-block secondary google-btn" onClick={registerWithGoogle} disabled={busy || googleBusy}>
-                <GoogleG /> {googleBusy ? 'Opening Google…' : 'Register with Gmail'}
-              </button>
-              <p className="google-note">Gmail sign-up is verified by Google; you will still enter your HR registration code on the next step.</p>
-            </div>
-          )}
-
-          <div className="login-note">
-            New accounts are created with the HR role. Already registered?{' '}
-            <Link to="/login">Sign in</Link>
-          </div>
-        </form>
+    <AuthShell
+      company={company}
+      info={{
+        title: 'Create your account',
+        subtitle: 'Employees and HR Admins register here — the same code applies to both.',
+        bullets: [
+          'Employee portal: attendance per cut-off, adjustments, claims, benefits, payroll summary',
+          'HR Admin: full payroll, compensation, attendance and reporting workspace',
+          'A registration code from the company is required',
+          'Employee sign-ups must use the company email on file, so the account links to your records',
+        ],
+        foot: 'Password resets are handled by the system administrator — there is no self-service reset.',
+      }}
+    >
+      <div className="form-head">
+        <h1>Register</h1>
+        <p>Join with your company registration code</p>
       </div>
-    </div>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {error && <div className="alert error">{error}</div>}
+        {success && <div className="alert success">{success}</div>}
+
+        <div className="login-field">
+          <label>Account type</label>
+          <div className="acct-seg">
+            <button type="button" className={accountType === 'Employee' ? 'active' : ''} onClick={() => setAccountType('Employee')}>
+              👤 Employee
+            </button>
+            <button type="button" className={accountType === 'HR' ? 'active' : ''} onClick={() => setAccountType('HR')}>
+              🛠 HR Admin
+            </button>
+          </div>
+          <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+            {accountType === 'Employee'
+              ? 'Self-service portal. Use the same email HR has on file for you.'
+              : 'Requires the registration code issued by the system administrator.'}
+          </span>
+        </div>
+
+        <div className="login-field">
+          <label htmlFor="email">Email address</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><Icon name="mail" /></span>
+            <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="username" required />
+          </div>
+        </div>
+
+        <div className="login-field">
+          <label htmlFor="username">Display name</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><Icon name="user" /></span>
+            <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Juan Dela Cruz" autoComplete="name" required />
+          </div>
+        </div>
+
+        <div className="login-field">
+          <label htmlFor="password">Password</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><Icon name="lock" /></span>
+            <input id="password" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" placeholder="Strong password required" required />
+            <button type="button" className="eye-btn" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((v) => !v)}>
+              <EyeIcon off={showPw} />
+            </button>
+          </div>
+          <ul className="pw-checks" aria-label="Password requirements">
+            {PASSWORD_RULES.map((rule) => {
+              const ok = rule.test(password);
+              return (
+                <li key={rule.id} className={ok ? 'ok' : ''}>
+                  <span className="dot">{ok ? '✓' : '○'}</span> {rule.label}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="login-field">
+          <label htmlFor="registration_code">Registration code</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><Icon name="key" /></span>
+            <input id="registration_code" type="text" value={registrationCode} onChange={(e) => setRegistrationCode(e.target.value)} placeholder="Provided by the company" required />
+          </div>
+        </div>
+
+        <div className="login-field terms-actions">
+          <input
+            id="terms-agree"
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => { setAgreed(e.target.checked); setError(''); }}
+          />
+          <label htmlFor="terms-agree">
+            I have read and agree to the{' '}
+            <Link to="/terms" target="_blank" rel="noreferrer">Terms and Conditions</Link>
+            {' '}of the Payroll Management System.
+          </label>
+        </div>
+
+        <button type="submit" className="btn-block" disabled={busy}>
+          {busy ? 'Creating account…' : `Register as ${accountType === 'HR' ? 'HR Admin' : 'Employee'}`}
+        </button>
+
+        {supabase && (
+          <div className="otp-block">
+            <div className="otp-divider"><span>or</span></div>
+            <button type="button" className="btn-block secondary google-btn" onClick={registerWithGoogle} disabled={busy || googleBusy}>
+              <GoogleG /> {googleBusy ? 'Opening Google…' : 'Register with Gmail'}
+            </button>
+            <p className="google-note">Gmail sign-up is verified by Google; you will still enter your registration code on the next step.</p>
+          </div>
+        )}
+
+        <div className="login-note">
+          Already registered?{' '}
+          <Link to="/login">Sign in</Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 }

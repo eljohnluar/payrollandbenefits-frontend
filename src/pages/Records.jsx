@@ -12,7 +12,7 @@ const TABS = [
 ];
 
 const LOADERS = {
-  payroll: () => Promise.all([api.get('/api/payroll/runs'), api.get('/api/payslips')]),
+  payroll: () => Promise.all([api.get('/api/payroll/runs')]),
   compensation: () => Promise.all([api.get('/api/employees'), api.get('/api/salary-history')]),
   claims: () => Promise.all([api.get('/api/claims')]),
   hmo: () => Promise.all([api.get('/api/benefit-plans'), api.get('/api/benefits/enrollments')]),
@@ -84,22 +84,10 @@ export default function Records() {
               empty="No payroll runs yet."
             />
           </Card>
-          <Card title="Payslip Records" body>
-            <DataTable
-              loading={state.loading}
-              columns={[
-                { key: 'employee_name', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.employee_name}</span> },
-                { key: 'department', label: 'Department' },
-                { key: 'period', label: 'Period' },
-                { key: 'gross_pay', label: 'Gross', align: 'right', render: (r) => money(r.gross_pay) },
-                { key: 'net_pay', label: 'Net', align: 'right', render: (r) => money(r.net_pay) },
-                { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
-                { key: 'pay_date', label: 'Pay Date', render: (r) => shortDate(r.pay_date) },
-              ]}
-              rows={second?.data}
-              empty="No payslips yet."
-            />
-          </Card>
+          <div className="info-banner">
+            <span>ℹ</span>
+            <span>Payslip records are generated, stored and released by the external <strong>Finance module</strong> — they are no longer kept or viewed in the Payroll &amp; Benefits System.</span>
+          </div>
         </>
       )}
 

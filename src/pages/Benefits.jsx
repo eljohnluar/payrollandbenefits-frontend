@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useResource } from '../hooks/useResource.js';
 import { api, qs } from '../api/client.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { PageHeader, StatsGrid, Stat, Card, DataTable, Field, Badge, Modal, Notice, money } from '../components/ui.jsx';
 import { shortDate } from '../lib/format.js';
 
@@ -15,8 +14,8 @@ const eePct = (r) => (r.employee_share != null ? Number(r.employee_share) : 100 
 const erPct = (r) => Number(r.employer_share || 0);
 
 export default function Benefits() {
-  const { user } = useAuth();
-  const canDecideLeave = user?.role === 'Admin' || user?.role === 'HR';
+  // Only HR Admin reaches this page now.
+  const canDecideLeave = true;
   const year = String(new Date().getFullYear());
   const { data: employees } = useResource('/api/employees');
   const { data: plans } = useResource('/api/benefit-plans');
@@ -91,6 +90,11 @@ export default function Benefits() {
     catch (err) { setNotice({ kind: 'error', msg: err.message }); }
   }
 
+  async function activate(id) {
+    try { await api.post(`/api/benefits/enrollments/${id}/activate`); setNotice({ kind: 'success', msg: 'Application activated.' }); reload(); }
+    catch (err) { setNotice({ kind: 'error', msg: err.message }); }
+  }
+
   async function remove(id) {
     if (!window.confirm('Delete this enrollment? It will be moved to the Archive.')) return;
     try { await api.del(`/api/benefits/enrollments/${id}`); setNotice({ kind: 'success', msg: 'Enrollment moved to the Archive.' }); reload(); }
@@ -156,6 +160,9 @@ export default function Benefits() {
     { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
     { key: 'actions', label: '', align: 'right', render: (r) => (
       <span style={{ display: 'inline-flex', gap: 6 }}>
+        {r.status === 'Pending' && (
+          <button className="btn btn-sm" onClick={() => activate(r.id)}>Activate</button>
+        )}
         {(r.status === 'Active' || r.status === 'Enrolled') && (
           <button className="btn ghost btn-sm" onClick={() => cancel(r.id)}>Cancel</button>
         )}

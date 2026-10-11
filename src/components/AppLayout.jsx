@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 
@@ -28,7 +28,7 @@ const Icon = ({ name }) => (
   </svg>
 );
 
-const SECTIONS = [
+const HR_SECTIONS = [
   {
     label: 'Payroll Management',
     links: [
@@ -38,7 +38,6 @@ const SECTIONS = [
       { to: '/attendance', text: 'Attendance', icon: 'calendar' },
       { to: '/payroll-run', text: 'Payroll Run', icon: 'play' },
       { to: '/tax', text: 'Tax & Contributions', icon: 'percent' },
-      { to: '/payslips', text: 'Payslips', icon: 'file' },
     ],
   },
   {
@@ -57,8 +56,24 @@ const SECTIONS = [
     links: [
       { to: '/settings', text: 'Settings', icon: 'settings' },
       { to: '/records', text: 'Records', icon: 'folder' },
-      { to: '/audit-log', text: 'Audit Log', icon: 'eye', roles: ['Admin', 'HR'] },
-      { to: '/archive', text: 'Archive', icon: 'file', roles: ['Admin', 'HR'] },
+      { to: '/audit-log', text: 'Audit Log', icon: 'eye' },
+      { to: '/archive', text: 'Archive', icon: 'file' },
+    ],
+  },
+];
+
+const EMPLOYEE_SECTIONS = [
+  {
+    label: 'My Workplace',
+    links: [
+      { to: '/employee', text: 'Dashboard', end: true, icon: 'dashboard' },
+      { to: '/employee/attendance', text: 'My Attendance', icon: 'calendar' },
+      { to: '/employee/leave', text: 'My Leave', icon: 'gift' },
+      { to: '/employee/claims', text: 'My Claims', icon: 'clipboard' },
+      { to: '/employee/benefits', text: 'My Benefits', icon: 'heart' },
+      { to: '/employee/payroll', text: 'Payroll Summary', icon: 'dollar' },
+      { to: '/employee/profile', text: 'My Profile', icon: 'users' },
+      { to: '/employee/settings', text: 'Settings', icon: 'settings' },
     ],
   },
 ];
@@ -83,6 +98,7 @@ export default function AppLayout() {
     return window.innerWidth <= 900; // phones start with the drawer closed
   });
   const [notifOpen, setNotifOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [company, setCompany] = useState('Payroll & Benefits');
@@ -113,8 +129,9 @@ export default function AppLayout() {
   useEffect(() => { loadNotifications(); }, []);
 
   useEffect(() => {
-    api.get('/api/settings')
-      .then((s) => s?.company_name && setCompany(s.company_name))
+    // Public branding endpoint: works for both HR Admin and Employee sessions.
+    api.get('/api/branding')
+      .then((b) => b?.company_name && setCompany(b.company_name))
       .catch(() => {});
   }, []);
 
@@ -136,10 +153,10 @@ export default function AppLayout() {
       <aside className="app-side">
         <div className="brand">
           <img src="/logo.jpg" alt="Company logo" />
-          <span className="brand-text">Payroll Management System</span>
+          <span className="brand-text">{user?.role === 'Employee' ? 'Employee Portal' : 'HR Admin Portal'}</span>
         </div>
         <nav className="side-nav">
-          {SECTIONS.map((section) => {
+          {(user?.role === 'Employee' ? EMPLOYEE_SECTIONS : HR_SECTIONS).map((section) => {
             const links = section.links.filter((l) => !l.roles || l.roles.includes(user?.role));
             if (!links.length) return null;
             return (
@@ -164,12 +181,7 @@ export default function AppLayout() {
         <div className="side-foot">
           <div className="user-text">
             <div className="name">{user?.name}</div>
-            <div>{user?.role}</div>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <button className="btn ghost small" onClick={logout}>
-              <span>Logout</span>
-            </button>
+            <div>{user?.role === 'Employee' ? 'Employee' : 'HR Admin'}</div>
           </div>
         </div>
       </aside>
@@ -209,13 +221,29 @@ export default function AppLayout() {
                 </div>
               )}
             </div>
-            <div className="topbar-user">
-              <div className="topbar-avatar" title={user?.name}>
-                <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
+            <div className="topbar-user" style={{ position: 'relative' }}>
+              <button type="button" className="topbar-id" aria-label="Account menu" onClick={() => setProfileOpen((o) => !o)}>
+                <span className="topbar-avatar">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </span>
+                <span className="topbar-id-name">{user?.name}</span>
+                <svg className={`topbar-id-caret${profileOpen ? ' open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
-              </div>
+              </button>
+              {profileOpen && (
+                <div className="profile-menu">
+                  <Link to={user?.role === 'Employee' ? '/employee/profile' : '/profile'} className="profile-menu-item" onClick={() => setProfileOpen(false)}>
+                    See Profile
+                  </Link>
+                  <button type="button" className="profile-menu-item danger" onClick={() => { setProfileOpen(false); logout(); }}>
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

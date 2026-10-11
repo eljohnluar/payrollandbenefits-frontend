@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { supabase } from '../lib/supabase.js';
 import { GoogleG } from '../components/GoogleIcon.jsx';
+import AuthShell, { HomeButton } from '../components/AuthShell.jsx';
 import { useAuth } from '../auth/AuthContext.jsx';
 
 const MailIcon = () => (
@@ -37,13 +38,52 @@ const EyeIcon = ({ off }) => (
   </svg>
 );
 
+const PORTAL_INFO = {
+  employee: {
+    title: 'Employee Portal',
+    subtitle: 'Self-service access for team members.',
+    bullets: [
+      'View your attendance per cut-off period',
+      'File adjustments when you were off-site or on the road',
+      'Submit reimbursement claims with receipts',
+      'Apply for HMO and benefit plans',
+      'Check your payroll summary — payslips are released by Finance',
+    ],
+    foot: 'No account yet? Register and choose Employee — you will need the company registration code. Forgot your password? Ask the system administrator to reset it.',
+  },
+  hr: {
+    title: 'HR Admin Portal',
+    subtitle: 'The full payroll & benefits workspace.',
+    bullets: [
+      'Compute payroll and submit it for external Finance approval',
+      'Compensation with DOLE minimum wage enforcement',
+      'Cut-off attendance records and adjustment reviews',
+      'Claims, benefits and 13th month management',
+      'Reports, records, audit log and settings',
+    ],
+    foot: 'New HR Admin? Register with the code issued by the system administrator.',
+  },
+  both: {
+    title: 'Payroll Management System',
+    subtitle: 'One login, two dashboards — the system routes you by role.',
+    bullets: [
+      'HR Admin: payroll runs, compensation, attendance, claims and reports',
+      'Employee: attendance, adjustments, claims, benefits and payroll summary',
+      'Attendance is recorded per cut-off period, not per day',
+      'Payslips are generated and released by the Finance module',
+    ],
+    foot: 'Employees and HR Admins can register with the company registration code. Password resets are handled by the system administrator.',
+  },
+};
+
 export default function Login() {
   const { user, login, logoutMessage, adoptSession } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const portal = params.get('as');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [forgotHint, setForgotHint] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
@@ -53,39 +93,13 @@ export default function Login() {
   const [otpCode, setOtpCode] = useState('');
   const [otpBusy, setOtpBusy] = useState(false);
   const [otpNote, setOtpNote] = useState('');
-  const [forgotStage, setForgotStage] = useState(false);
-  const [forgotBusy, setForgotBusy] = useState(false);
-  const [forgotNote, setForgotNote] = useState('');
   const [company, setCompany] = useState('');
 
   useEffect(() => {
     api.get('/api/branding').then((b) => setCompany(b?.company_name || '')).catch(() => {});
   }, []);
 
-  if (user) return <Navigate to="/" replace />;
-
-  async function sendResetLink(event) {
-    event.preventDefault();
-    if (!supabase) return;
-    if (!email) {
-      setError('Enter your email address first, then request the reset link.');
-      return;
-    }
-    setForgotBusy(true);
-    setError('');
-    setForgotNote('');
-    try {
-      const { error: sbError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset`,
-      });
-      if (sbError) throw new Error(sbError.message);
-      setForgotNote(`If ${email} is registered, a password-reset link is on its way to your Gmail inbox.`);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setForgotBusy(false);
-    }
-  }
+  if (user) return <Navigate to={user.role === 'Employee' ? '/employee' : '/'} replace />;
 
   async function loginWithGoogle() {
     setGoogleBusy(true);
@@ -139,7 +153,7 @@ export default function Login() {
         await sendLoginCode(result.email);
       }
       // No otp_required and no supabase client: legacy direct session.
-      else navigate('/', { replace: true });
+      else navigate(result?.role === 'Employee' ? '/employee' : '/', { replace: true });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -156,8 +170,8 @@ export default function Login() {
       if (sbError) throw new Error(sbError.message);
       const { status, payload } = await api.supabaseLogin(data.session.access_token, { pending });
       if (status === 200) {
-        adoptSession(payload);
-        navigate('/', { replace: true });
+        const sessionUser = adoptSession(payload);
+        navigate(sessionUser?.role === 'Employee' ? '/employee' : '/', { replace: true });
         return;
       }
       setError(payload?.error || 'Verification failed.');
@@ -188,7 +202,8 @@ export default function Login() {
   if (otpStage) {
     return (
       <div className="login-wrap">
-        <div className="login-card">
+        <div className="login-card" style={{ position: 'relative' }}>
+          <HomeButton />
           <div className="login-hero">
             <div className="login-logo"><img src="/logo.jpg" alt="Company logo" /></div>
             <h1>Check your email</h1>
@@ -225,100 +240,69 @@ export default function Login() {
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        <div className="login-hero">
-          <div className="login-logo"><img src="/logo.jpg" alt="Company logo" /></div>
-          {company && <div className="brand-company">{company}</div>}
-          <h1>Payroll Management System</h1>
-          <p>Welcome back — sign in to your workspace account</p>
-        </div>
-        <form className="login-body" onSubmit={submit}>
-          {logoutMessage && <div className="alert">{logoutMessage}</div>}
-          {error && <div className="alert error">{error}</div>}
-          {forgotHint && <div className="alert success">{forgotHint}</div>}
-
-          <div className="login-field">
-            <label htmlFor="login-email">Email address</label>
-            <div className="input-wrap">
-              <span className="lead-icon"><MailIcon /></span>
-              <input
-                id="login-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                autoComplete="username"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="login-field">
-            <div className="label-row">
-              <label htmlFor="login-password">Password</label>
-              <button
-                type="button"
-                className="forgot-link"
-                onClick={() => {
-                  setError('');
-                  setForgotNote('');
-                  if (supabase) setForgotStage((v) => !v);
-                  else setForgotHint('Password resets are handled by your HR administrator.');
-                }}
-              >
-                Forgot password?
-              </button>
-            </div>
-            <div className="input-wrap">
-              <span className="lead-icon"><LockIcon /></span>
-              <input
-                id="login-password"
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-              <button type="button" className="eye-btn" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((v) => !v)}>
-                <EyeIcon off={showPw} />
-              </button>
-            </div>
-          </div>
-
-          <button id="login-submit" type="submit" className="btn-block" disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign In'}
-          </button>
-
-          {forgotStage && supabase && !otpStage && (
-            <div className="otp-block">
-              <div className="otp-divider"><span>reset via Gmail</span></div>
-              {forgotNote && <div className="alert success">{forgotNote}</div>}
-              <button type="button" className="btn-block secondary" onClick={sendResetLink} disabled={forgotBusy}>
-                {forgotBusy ? 'Sending link…' : 'Email me a password-reset link'}
-              </button>
-              <button type="button" className="forgot-link otp-cancel" onClick={() => { setForgotStage(false); setForgotNote(''); }}>
-                Back to sign in
-              </button>
-            </div>
-          )}
-
-          {supabase && (
-            <div className="otp-block">
-              <div className="otp-divider"><span>or</span></div>
-              <button type="button" className="btn-block secondary google-btn" onClick={loginWithGoogle} disabled={busy || googleBusy}>
-                <GoogleG /> {googleBusy ? 'Opening Google…' : 'Sign in with Gmail'}
-              </button>
-              <p className="google-note">Gmail sign-in skips the email code.</p>
-            </div>
-          )}
-
-          <div className="login-note">
-            New accounts are provisioned by your HR administrator. Have a registration code?{' '}
-            <Link to="/register">Create an account</Link>
-          </div>
-        </form>
+    <AuthShell company={company} info={PORTAL_INFO[portal] || PORTAL_INFO.both}>
+      <div className="form-head">
+        <h1>Sign in</h1>
+        <p>{portal === 'employee' ? 'Employee portal — use your company account' : portal === 'hr' ? 'HR Admin workspace' : 'Welcome back — sign in to your workspace account'}</p>
       </div>
-    </div>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {logoutMessage && <div className="alert">{logoutMessage}</div>}
+        {error && <div className="alert error">{error}</div>}
+
+        <div className="login-field">
+          <label htmlFor="login-email">Email address</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><MailIcon /></span>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
+              autoComplete="username"
+              required
+            />
+          </div>
+        </div>
+
+        <div className="login-field">
+          <label htmlFor="login-password">Password</label>
+          <div className="input-wrap">
+            <span className="lead-icon"><LockIcon /></span>
+            <input
+              id="login-password"
+              type={showPw ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+            <button type="button" className="eye-btn" aria-label={showPw ? 'Hide password' : 'Show password'} onClick={() => setShowPw((v) => !v)}>
+              <EyeIcon off={showPw} />
+            </button>
+          </div>
+        </div>
+
+        <button id="login-submit" type="submit" className="btn-block" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign In'}
+        </button>
+
+        {supabase && (
+          <div className="otp-block">
+            <div className="otp-divider"><span>or</span></div>
+            <button type="button" className="btn-block secondary google-btn" onClick={loginWithGoogle} disabled={busy || googleBusy}>
+              <GoogleG /> {googleBusy ? 'Opening Google…' : 'Sign in with Gmail'}
+            </button>
+            <p className="google-note">Gmail sign-in skips the email code.</p>
+          </div>
+        )}
+
+        <div className="login-note">
+          Employees and HR Admins can register with the company registration code. Forgot your password? Ask
+          the system administrator to reset it.{' '}
+          <Link to="/register">Create an account</Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 }

@@ -1,18 +1,80 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useResource } from '../hooks/useResource.js';
-import { PageHeader, StatsGrid, Stat, DataTable, Card, Badge, money } from '../components/ui.jsx';
+import { api } from '../api/client.js';
+import { PageHeader, StatsGrid, Stat, DataTable, Card, Badge, Modal, Field, money } from '../components/ui.jsx';
 
 const DEPARTMENTS = ['IT Department', 'HR Department', 'Finance Department', 'Operations', 'Marketing'];
 const STATUSES = ['Active', 'On Leave', 'Resigned', 'Terminated'];
 
 const muted = { fontSize: 11, color: 'var(--text-muted)' };
 
+/** HR-side login management: create the employee account or reset its password. */
+function AccountModal({ employee, account, onClose, onDone }) {
+  const isCreate = !account;
+  const [email, setEmail] = useState(account?.email || employee?.email || '');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      if (isCreate) {
+        await api.post(`/api/employees/${employee.id}/account`, { email, password });
+      } else {
+        await api.put(`/api/employees/${employee.id}/account`, { password });
+      }
+      onDone();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!employee) return null;
+  return (
+    <Modal open onClose={onClose} title={isCreate ? `Create login for ${employee.first_name} ${employee.last_name}` : `Reset password — ${employee.first_name} ${employee.last_name}`}>
+      {error && <div className="alert error">{error}</div>}
+      <form onSubmit={submit} className="form-grid">
+        {isCreate && (
+          <Field label="Company email (login)">
+            <input type="email" className="form-control" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+        )}
+        <Field label={isCreate ? 'Initial password' : 'New password'}>
+          <input type="text" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8}
+            placeholder="Min 8 chars with upper, lower, number and symbol" />
+        </Field>
+        <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+          The employee signs in with this email and password (plus the email verification code) on the same
+          login page and lands on the Employee portal. Passwords are only ever reset here — there is no
+          self-service forgot password.
+        </p>
+        <button type="submit" className="btn-block" disabled={busy}>
+          {busy ? 'Saving…' : (isCreate ? 'Create Account' : 'Set New Password')}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 export default function Employees() {
   const { data, loading, error } = useResource('/api/employees');
+  const { data: accountRows, reload: reloadAccounts } = useResource('/api/employee-accounts');
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [accountTarget, setAccountTarget] = useState(null); // { employee, account }
+
+  const accountByEmployee = useMemo(() => {
+    const map = {};
+    for (const a of accountRows || []) if (a.employee_id) map[a.employee_id] = a;
+    return map;
+  }, [accountRows]);
 
   // Departments present in the roster (union with the canonical list) for the filter.
   const filterDepartments = useMemo(() => {
@@ -59,9 +121,18 @@ export default function Employees() {
       : <span style={{ color: 'var(--text-muted)' }}>—</span> },
     { key: 'hire_date', label: 'Hired', render: (r) => r.hire_date },
     { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
+    { key: 'account', label: 'Login', render: (r) => {
+      const a = accountByEmployee[r.id];
+      return a?.is_active === false ? <span className="badge badge-muted" title={a.email}>Disabled</span>
+        : a ? <span className="badge badge-success" title={a.email}>Portal</span>
+        : <span style={{ color: 'var(--text-muted)' }}>—</span>;
+    } },
     { key: 'actions', label: '', align: 'right', render: (r) => (
       <span style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <Link className="btn ghost btn-sm" to={`/employees/${r.id}`}>View</Link>
+        <button className="btn ghost btn-sm" onClick={() => setAccountTarget({ employee: r, account: accountByEmployee[r.id] || null })}>
+          {accountByEmployee[r.id] ? 'Reset Password' : 'Create Login'}
+        </button>
       </span>
     ) },
   ];
@@ -102,6 +173,15 @@ export default function Employees() {
       <Card>
         <DataTable columns={columns} rows={rows} loading={loading} error={error} empty="No employees found." />
       </Card>
+
+      {accountTarget && (
+        <AccountModal
+          employee={accountTarget.employee}
+          account={accountTarget.account}
+          onClose={() => setAccountTarget(null)}
+          onDone={() => { setAccountTarget(null); reloadAccounts(); }}
+        />
+      )}
     </>
   );
 }

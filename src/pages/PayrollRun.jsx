@@ -2,12 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api/client.js';
 import { money, shortDate } from '../lib/format.js';
 import { useRealtime } from '../hooks/useRealtime.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice } from '../components/ui.jsx';
-import PayslipGate from '../components/PayslipGate.jsx';
-
-const OPERATE_ROLES = ['admin', 'hr', 'payroll'];
-const FINANCE_ROLES = ['admin', 'finance'];
 
 const RANGES = { '30d': '30 Days', '3m': '3 Months', '1y': '1 Year' };
 const RANGE_MODIFY = { '30d': -30, '3m': -3, '1y': -12 };
@@ -173,8 +168,8 @@ function DeductionDonut({ items, period }) {
   );
 }
 
-/* ── Status workflow panels below the run card ── */
-function FinancePanels({ run, snapshot, canFinance, busy, onDecide, onMarkPaid, onClose }) {
+/* ── Status panels below the run card — approval happens in the external Finance module ── */
+function StatusPanels({ run, snapshot }) {
   const fa = run.finance_approval;
   if (run.status === 'Pending Finance Approval') {
     return (
@@ -182,11 +177,12 @@ function FinancePanels({ run, snapshot, canFinance, busy, onDecide, onMarkPaid, 
         <div className="card-body">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 20 }}>🛡️</span>
+              <span style={{ fontSize: 20 }}>📤</span>
               <div>
-                <h4 style={{ margin: 0, color: 'var(--text-main)' }}>Finance Review &amp; Verification</h4>
+                <h4 style={{ margin: 0, color: 'var(--text-main)' }}>Submitted for external Finance approval</h4>
                 <div style={{ ...muted, fontSize: 12 }}>
-                  Submitted by {fa?.submitter_name || 'HR'} on {shortDate(fa?.submitted_at || run.created_at)}
+                  Submitted by {fa?.submitter_name || 'HR Admin'} on {shortDate(fa?.submitted_at || run.created_at)} ·
+                  Approval, payslip generation and disbursement are handled by the Finance module, not here.
                 </div>
               </div>
             </div>
@@ -199,90 +195,37 @@ function FinancePanels({ run, snapshot, canFinance, busy, onDecide, onMarkPaid, 
               </span>
             </div>
           </div>
-          <p style={{ fontSize: 13, ...muted, margin: '0 0 12px' }}>
+          <p style={{ fontSize: 13, ...muted, margin: 0 }}>
             Gross payroll: <strong>{money(snapshot.budget_required)}</strong> against {money(snapshot.budget_remaining)} budget remaining.
-            Net disbursement: <strong>{money(snapshot.cash_required)}</strong> against {money(snapshot.cash_available)} available cash.
-            Please also verify statutory liabilities and department allocations.
+            Net requirement: <strong>{money(snapshot.cash_required)}</strong> against {money(snapshot.cash_available)} available cash.
           </p>
-          {canFinance && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-              <button className="btn btn-primary btn-sm" disabled={!!busy} onClick={() => onDecide('Approved', '', 'Approve payroll and generate General Ledger accruals?')}>
-                Approve Payroll
-              </button>
-              <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} disabled={!!busy} onClick={() => onDecide('Rejected', '', 'Reject this payroll run?')}>
-                Reject
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
   }
-  if (run.status === 'Approved') {
-    const earliest = run.earliest_pay_date;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const waiting = !!earliest && todayIso < earliest;
+  if (['Approved', 'Paid', 'Closed'].includes(run.status)) {
     return (
       <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--success)', background: 'rgba(16, 185, 129, 0.05)' }}>
         <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>✅ Approved by Finance</h4>
+            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>✅ {run.status} (Finance module)</h4>
             <div style={{ ...muted, fontSize: 12 }}>
-              Reviewed by {run.finance_approval?.reviewer_name || 'Finance Officer'} on {shortDate(run.finance_approval?.reviewed_at)} ·
-              General Ledger accrual entries posted.
+              This run was completed outside the Payroll &amp; Benefits System — payslips and fund release live in Finance.
             </div>
-            {earliest && (
-              <div style={{ ...muted, fontSize: 12, marginTop: 4 }}>
-                ⏳ Mandatory 3-day payslip lead time: salary may be released from <strong>{shortDate(earliest)}</strong>.
-              </div>
-            )}
           </div>
-          {canFinance && (
-            <button
-              className="btn btn-success"
-              disabled={!!busy || waiting}
-              title={waiting ? `Disbursement unlocks on ${shortDate(earliest)}` : undefined}
-              onClick={() => onMarkPaid('Release disbursements to employee E-Wallets and record Cash settlement?')}
-            >
-              {waiting ? `Release unlocks ${shortDate(earliest)}` : 'Release & Disburse Funds'}
-            </button>
-          )}
+          <span className="badge badge-success" style={{ padding: '6px 12px' }}>{run.status}</span>
         </div>
       </div>
     );
   }
-  if (run.status === 'Paid') {
+  if (['On Hold', 'Rejected'].includes(run.status)) {
     return (
-      <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--primary)', background: 'rgba(5, 150, 105, 0.05)' }}>
-        <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>💰 Disbursed &amp; Completed</h4>
-            <div style={{ ...muted, fontSize: 12 }}>
-              Reference: <strong>{run.disbursement?.reference_no || `PAY-${run.id}`}</strong> · Released via Cash Management on{' '}
-              {shortDate(run.disbursement?.processed_at || run.run_date)}
-            </div>
+      <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--danger)', background: 'rgba(220, 38, 38, 0.05)' }}>
+        <div className="card-body">
+          <h4 style={{ margin: 0, color: 'var(--text-main)' }}>{run.status === 'On Hold' ? '⏸ On Hold' : '⛔ Rejected'}</h4>
+          <div style={{ ...muted, fontSize: 12, marginTop: 4 }}>
+            Finance decision: {fa?.decision_notes || 'No notes recorded.'}
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span className="badge badge-success" style={{ padding: '6px 12px' }}>Funds Released</span>
-            {canFinance && (
-              <button className="btn btn-secondary btn-sm" disabled={!!busy} onClick={() => onClose('Close this reconciled payroll run?')}>
-                Close Payroll
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (run.status === 'Closed') {
-    return (
-      <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid var(--success)', background: 'rgba(16, 185, 129, 0.05)' }}>
-        <div className="card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-          <div>
-            <h4 style={{ margin: 0, color: 'var(--text-main)' }}>✓ Payroll Closed</h4>
-            <div style={{ ...muted, fontSize: 12 }}>Disbursement and accounting records are finalized for this payroll cycle.</div>
-          </div>
-          <span className="badge badge-success" style={{ padding: '6px 12px' }}>Finalized</span>
         </div>
       </div>
     );
@@ -290,8 +233,35 @@ function FinancePanels({ run, snapshot, canFinance, busy, onDecide, onMarkPaid, 
   return null;
 }
 
+/* ── Statutory deduction basis: bracket + rate + employee share (revision #7) ── */
+function StatutoryBasis({ item }) {
+  let basis = null;
+  try { basis = item.statutory_basis ? JSON.parse(item.statutory_basis) : null; } catch { /* pre-revision row */ }
+  if (!basis) {
+    return (
+      <div>
+        <div style={blockLabel}>Deduction Basis</div>
+        <div style={{ ...muted, fontSize: 11 }}>Recompute this run to capture the SSS / PhilHealth / Pag-IBIG salary bracket and rate used.</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={blockLabel}>Deduction Basis — SSS, PhilHealth &amp; Pag-IBIG</div>
+      <div style={{ ...muted, fontSize: 11, marginBottom: 6 }}>Salary basis: {money(basis.salary_basis)}</div>
+      {['sss', 'philhealth', 'pagibig'].map((k) => (
+        <div key={k} style={{ marginBottom: 8, fontSize: 11 }}>
+          <div style={{ fontWeight: 700 }}>{basis[k].agency}</div>
+          <div>{basis[k].bracket}</div>
+          <div>{basis[k].ee_basis} → <strong>{money(basis[k].ee_share)}</strong> · {basis[k].er_basis} → {money(basis[k].er_share)}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ── Expandable per-employee breakdown row ── */
-function DetailRow({ item, colSpan, busy, onViewPdf, onGenerate }) {
+function DetailRow({ item, colSpan }) {
   const block = (title, sub, amount, style) => (
     <div>
       <div style={blockLabel}>{title}</div>
@@ -320,15 +290,7 @@ function DetailRow({ item, colSpan, busy, onViewPdf, onGenerate }) {
             semibold
           )}
           {block('Deductions', 'Unpaid leave, late deductions & HMO employee share', money(num(item.unpaid_leave_deduction) + num(item.hmo_deduction) + num(item.attendance_deduction)), { ...semibold, color: 'var(--danger)' })}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, justifyContent: 'flex-start' }}>
-            <div style={blockLabel}>Payslip</div>
-            <button className="btn btn-secondary btn-sm" disabled={busy === `pdf-${item.id}`} onClick={() => onViewPdf(item)}>
-              {busy === `pdf-${item.id}` ? 'Opening…' : 'View PDF'}
-            </button>
-            <button className="btn btn-secondary btn-sm" disabled={busy === `pdf-gen-${item.id}`} onClick={() => onGenerate(item)}>
-              {busy === `pdf-gen-${item.id}` ? 'Working…' : 'Generate'}
-            </button>
-          </div>
+          <StatutoryBasis item={item} />
         </div>
       </td>
     </tr>
@@ -336,10 +298,8 @@ function DetailRow({ item, colSpan, busy, onViewPdf, onGenerate }) {
 }
 
 export default function PayrollRun() {
-  const { user } = useAuth();
-  const role = String(user?.role || '').toLowerCase();
-  const canOperate = OPERATE_ROLES.includes(role);
-  const canFinance = FINANCE_ROLES.includes(role);
+  // Only HR Admin reaches this page; the external Finance module owns approval.
+  const canOperate = true;
 
   const [runs, setRuns] = useState([]);
   const [runId, setRunId] = useState(null);
@@ -347,11 +307,8 @@ export default function PayrollRun() {
   const [range, setRange] = useState('30d');
   const [trend, setTrend] = useState([]);
   const [payDate, setPayDate] = useState('');
-  const [showHold, setShowHold] = useState(false);
-  const [holdNotes, setHoldNotes] = useState('');
   const [expanded, setExpanded] = useState({});
   const [showImport, setShowImport] = useState(false);
-  const [gate, setGate] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
@@ -460,17 +417,6 @@ export default function PayrollRun() {
     act(key, () => api.post(`/api/payroll/runs/${run.id}/${path}`, body ?? {}), okMsg);
   };
 
-  function decide(decision, notes, message) {
-    if (!window.confirm(message)) return;
-    act(
-      `decide-${decision}`,
-      () => api.post(`/api/payroll/runs/${run.id}/decision`, { decision, notes }),
-      `Payroll ${decision} by Finance.`
-    );
-    setShowHold(false);
-    setHoldNotes('');
-  }
-
   function toggleInfo(item) {
     setExpanded((m) => ({ ...m, [item.employee_id]: !m[item.employee_id] }));
   }
@@ -500,27 +446,6 @@ export default function PayrollRun() {
     );
   }
 
-  async function generatePayslip(item) {
-    setBusy(`pdf-gen-${item.id}`);
-    setError('');
-    try {
-      const result = await api.post(`/api/payslips/generate/${item.id}`);
-      setNotice(
-        result.stored
-          ? `Payslip for ${result.employee} uploaded to ${result.object_key}.`
-          : `Payslip for ${result.employee} rendered; storage keys are not configured yet.`
-      );
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy('');
-    }
-  }
-
-  function viewPayslip(item) {
-    setGate({ id: item.id, label: `${item.employee_name} — ${run.period}` });
-  }
-
   const disbursements = useMemo(() => {
     const groups = {};
     included.forEach((it) => {
@@ -535,7 +460,7 @@ export default function PayrollRun() {
 
   return (
     <>
-      <PageHeader title="Payroll Run" subtitle="Compute a period, pass Finance approval, disburse and close." right={run ? <Badge>{run.status}</Badge> : undefined} />
+      <PageHeader title="Payroll Run" subtitle="Compute a period and submit it for external Finance approval — payslips and disbursement belong to Finance." right={run ? <Badge>{run.status}</Badge> : undefined} />
 
       {/* Range + run selector, mirroring the PHP page header */}
       <div className="page-header" style={{ alignItems: 'center', marginTop: -6, marginBottom: 18 }}>
@@ -601,15 +526,8 @@ export default function PayrollRun() {
                     </button>
                   </>
                 )}
-                {run.status === 'Pending Finance Approval' && canFinance && (
-                  <>
-                    <button className="btn btn-success" disabled={!!busy} onClick={() => decide('Approved', '', 'Approve this payroll run for disbursement?')}>Approve</button>
-                    <button className="btn btn-secondary" disabled={!!busy} onClick={() => setShowHold((v) => !v)}>Hold</button>
-                    <button className="btn btn-ghost" style={{ color: 'var(--danger)' }} disabled={!!busy} onClick={() => decide('Rejected', '', 'Reject this payroll run?')}>Reject</button>
-                  </>
-                )}
-                {run.status === 'Pending Finance Approval' && !canFinance && (
-                  <span style={{ ...muted, fontSize: 12 }}>Awaiting Finance Review</span>
+                {run.status === 'Pending Finance Approval' && (
+                  <span style={{ ...muted, fontSize: 12 }}>Awaiting Finance decision (external module)</span>
                 )}
                 {['On Hold', 'Rejected'].includes(run.status) && (
                   <button className="btn btn-secondary" disabled={!!busy || !canOperate} onClick={() => act('reopen', () => api.post(`/api/payroll/runs/${run.id}/return-to-draft`), 'Payroll returned to Draft for revision.')}>
@@ -618,32 +536,9 @@ export default function PayrollRun() {
                 )}
               </div>
             </div>
-            {showHold && run.status === 'Pending Finance Approval' && canFinance && (
-              <div className="card-body" style={{ display: 'flex', gap: 6, alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Reason for hold"
-                  style={{ width: 220, padding: '6px 10px' }}
-                  value={holdNotes}
-                  onChange={(e) => setHoldNotes(e.target.value)}
-                />
-                <button className="btn btn-secondary btn-sm" disabled={!holdNotes.trim() || !!busy} onClick={() => decide('On Hold', holdNotes.trim(), 'Place this payroll run on hold?')}>
-                  Confirm Hold
-                </button>
-              </div>
-            )}
           </div>
 
-          <FinancePanels
-            run={run}
-            snapshot={snapshot}
-            canFinance={canFinance}
-            busy={busy}
-            onDecide={decide}
-            onMarkPaid={(msg) => confirmAct('markpaid', msg, 'mark-paid', {}, `Payroll Disbursed & Marked as Paid.`)}
-            onClose={(msg) => confirmAct('close', msg, 'close', {}, 'Payroll closed after disbursement reconciliation.')}
-          />
+          <StatusPanels run={run} snapshot={snapshot} />
 
           <StatsGrid>
             <Stat label="Payroll Expense" value={<span style={{ color: 'var(--text-main)' }}>{money(totals.gross)}</span>} />
@@ -708,8 +603,6 @@ export default function PayrollRun() {
                         }), 'Inclusion status updated. Recompute required.')
                       }
                       onInfo={() => toggleInfo(item)}
-                      onViewPdf={viewPayslip}
-                      onGenerate={generatePayslip}
                     />
                   ))}
                   {!items.length && (
@@ -733,7 +626,8 @@ export default function PayrollRun() {
               <div>
                 <h4 style={{ color: 'var(--text-main)', margin: '0 0 4px' }}>Automated Outputs</h4>
                 <p style={{ ...muted, margin: 0, fontSize: 13 }}>
-                  Payslip PDF generation via Dompdf and Email Notifications to employees will trigger when the run is marked as <strong>Paid</strong>.
+                  Payslip generation and email delivery are handled by the Finance module after approval —
+                  this system prepares and submits the payroll data only.
                 </p>
               </div>
             </div>
@@ -787,8 +681,11 @@ export default function PayrollRun() {
             </div>
           )}
 
-          {/* Disbursement summary by e-wallet provider */}
-          <h3 style={{ fontSize: 16, color: 'var(--text-main)', margin: '0 0 16px' }}>Disbursement Summary</h3>
+          {/* Net-pay grouping handed to the external Finance module for disbursement */}
+          <h3 style={{ fontSize: 16, color: 'var(--text-main)', margin: '0 0 4px' }}>Finance Handoff Summary</h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>
+            Net pay grouped by e-wallet provider — export it for the Finance module, which performs the actual disbursement.
+          </p>
           <div className="grid-2" style={{ alignItems: 'start' }}>
             {disbursements.map(([prov, list]) => {
               const subtotal = list.reduce((a, e) => a + num(e.net_pay), 0);
@@ -825,8 +722,6 @@ export default function PayrollRun() {
               );
             })}
           </div>
-
-          <PayslipGate target={gate} onClose={() => setGate(null)} />
         </>
       )}
     </>
@@ -834,7 +729,7 @@ export default function PayrollRun() {
 }
 
 /* Master-list row + expandable detail */
-function FragmentRow({ item, isDraft, canOperate, expanded, busy, onToggleInclude, onInfo, onViewPdf, onGenerate }) {
+function FragmentRow({ item, isDraft, canOperate, expanded, onToggleInclude, onInfo }) {
   return (
     <>
       <tr style={{ opacity: item.is_included ? 1 : 0.45 }}>
@@ -859,7 +754,7 @@ function FragmentRow({ item, isDraft, canOperate, expanded, busy, onToggleInclud
         </td>
       </tr>
       {expanded && (
-        <DetailRow item={item} colSpan={12} busy={busy} onViewPdf={onViewPdf} onGenerate={onGenerate} />
+        <DetailRow item={item} colSpan={12} />
       )}
     </>
   );

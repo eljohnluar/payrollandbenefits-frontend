@@ -90,6 +90,8 @@ export default function Compensation() {
   }
 
   const setSalary = (k) => (e) => setSalaryForm((f) => ({ ...f, [k]: e.target.value }));
+  const minWage = Number(settings?.minimum_wage_monthly ?? 0) || 13420;
+  const belowMinWage = salaryForm.basic_salary !== '' && Number(salaryForm.basic_salary) < minWage;
   const setAllowance = (k) => (e) => setAllowanceForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
   const setLoan = (k) => (e) => setLoanForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -572,12 +574,20 @@ export default function Compensation() {
         <form onSubmit={saveSalary}>
           <div className="form-grid-2">
             <Field label="New Basic Salary (PHP)">
-              <input className="form-control" type="number" step="0.01" min="0" value={salaryForm.basic_salary} onChange={setSalary('basic_salary')} required placeholder="0.00" />
+              <input className="form-control" type="number" step="0.01" min="0" value={salaryForm.basic_salary} onChange={setSalary('basic_salary')} required placeholder="0.00"
+                style={belowMinWage ? { borderColor: 'var(--danger)' } : undefined} />
             </Field>
             <Field label="Effective Date">
               <input className="form-control" type="date" value={salaryForm.effective_date} onChange={setSalary('effective_date')} required />
             </Field>
           </div>
+          {belowMinWage && (
+            <div className="alert error" style={{ marginBottom: 10 }}>
+              ⚠ Below DOLE minimum wage. The monthly basic salary must be at least{' '}
+              <strong>{money(minWage)}</strong> for the applicable region. Correct the amount before saving —
+              the system will block this record. (Adjust the enforced minimum in Settings.)
+            </div>
+          )}
           <div className="form-group">
             <Field label="Reason for Adjustment">
               <input className="form-control" value={salaryForm.reason} onChange={setSalary('reason')} required placeholder="e.g. Annual merit increase, Promotion, Market adjustment" />
@@ -585,7 +595,7 @@ export default function Compensation() {
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setSalaryOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={busy}>Save Salary</button>
+            <button type="submit" className="btn btn-primary" disabled={busy || belowMinWage}>Save Salary</button>
           </div>
         </form>
       </Modal>

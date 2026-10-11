@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { money } from '../lib/format.js';
-import { useAuth } from '../auth/AuthContext.jsx';
 import { useRealtime } from '../hooks/useRealtime.js';
 import { useResource } from '../hooks/useResource.js';
 import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Loading } from '../components/ui.jsx';
@@ -98,12 +97,61 @@ function activityText(details) {
   }
 }
 
+function AnnouncementsCard() {
+  const { data, loading, reload } = useResource('/api/announcements');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const items = data || [];
+
+  async function post(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/api/announcements', { title, body });
+      setTitle('');
+      setBody('');
+      reload();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card title="Announcements" body>
+      <p style={{ marginTop: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+        Posts appear on every employee&apos;s dashboard under &quot;Latest Announcement&quot;.
+      </p>
+      {error && <div className="alert error">{error}</div>}
+      <form onSubmit={post} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+        <input className="form-control" placeholder="Announcement title" value={title} onChange={(e) => setTitle(e.target.value)} required maxLength={120} />
+        <textarea className="form-control" rows={2} placeholder="Message for all employees (optional)" value={body} onChange={(e) => setBody(e.target.value)} />
+        <div><button type="submit" className="btn btn-secondary btn-sm" disabled={busy}>{busy ? 'Posting…' : 'Post announcement'}</button></div>
+      </form>
+      {loading && <p style={{ color: 'var(--text-muted)' }}>Loading…</p>}
+      {!loading && items.length === 0 && <div className="empty-state">No announcements yet.</div>}
+      {items.slice(0, 5).map((a) => (
+        <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>{a.title}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{shortDate(a.created_at)}</span>
+          </div>
+          {a.body && <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 0 0', lineHeight: 1.55 }}>{a.body}</p>}
+          <div style={{ fontSize: 11, marginTop: 4, color: 'var(--text-muted)' }}>Posted by {a.created_by}</div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 export default function Dashboard() {
-  const { user } = useAuth();
   const [summary, setSummary] = useState(null);
   const { data: inc } = useResource('/api/incentives/summary');
   const [error, setError] = useState('');
-  const [busyRun, setBusyRun] = useState(null);
 
   const load = useCallback(() => {
     api.get('/api/dashboard/summary').then(setSummary).catch((e) => setError(e.message));
@@ -111,21 +159,6 @@ export default function Dashboard() {
 
   useEffect(load, [load]);
   useRealtime('payroll_runs', load);
-
-  const canApprove = ['Admin', 'Finance'].includes(user?.role);
-
-  async function approve(runId) {
-    if (!window.confirm('Approve this payroll run?')) return;
-    setBusyRun(runId);
-    try {
-      await api.post(`/api/payroll/runs/${runId}/decision`, { decision: 'Approved', notes: 'Approved from dashboard' });
-      load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusyRun(null);
-    }
-  }
 
   const runColumns = [
     { key: 'period', label: 'Period' },
@@ -171,13 +204,15 @@ export default function Dashboard() {
             <Stat label="Employees" value={summary.employees.total} sub={`${summary.employees.active} active`} />
           </StatsGrid>
 
+          <AnnouncementsCard />
+
           {summary.pending_approvals?.length > 0 && (
             <Card>
               <div className="card-header" style={{ borderLeft: '4px solid var(--warning)' }}>
                 <div>
-                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>🛡️ Payroll Runs Awaiting Finance Approval</h2>
+                  <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>📤 Payroll Runs Submitted for Finance Approval</h2>
                   <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-                    Finance approval is required before funds can be released and disbursed to employees.
+                    Approval and disbursement are handled by the external Finance module — this system prepares and submits the payroll.
                   </p>
                 </div>
               </div>
@@ -206,16 +241,6 @@ export default function Dashboard() {
                         <td><span className="badge badge-warning">Pending Finance</span></td>
                         <td style={{ textAlign: 'right' }}>
                           <Link className="btn btn-secondary btn-sm" to="/payroll-run">Review</Link>
-                          {canApprove && (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              style={{ marginLeft: 6 }}
-                              disabled={busyRun === pa.payroll_run_id}
-                              onClick={() => approve(pa.payroll_run_id)}
-                            >
-                              {busyRun === pa.payroll_run_id ? 'Approving…' : 'Approve'}
-                            </button>
-                          )}
                         </td>
                       </tr>
                     ))}
@@ -325,7 +350,7 @@ export default function Dashboard() {
           )}
 
           <div className="grid-2">
-            <Card title="Recent Payroll Items" right={<Link to="/payslips" className="btn btn-secondary btn-sm">Payslips</Link>}>
+            <Card title="Recent Payroll Items" right={<Link to="/payroll-run" className="btn btn-secondary btn-sm">Payroll Run</Link>}>
               <DataTable
                 columns={[
                   { key: 'employee_name', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.employee_name}</span> },

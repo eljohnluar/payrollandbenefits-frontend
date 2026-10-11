@@ -117,8 +117,8 @@ const FEATURES = [
   },
   {
     icon: <Icons.Calendar />,
-    title: 'Attendance & DTR Records',
-    description: 'Track daily clock-in records, shift schedules, overtime filings, leaves of absence and tardiness penalties in one central register.',
+    title: 'Cut-off Attendance & Adjustments',
+    description: 'Record attendance per 15-day cut-off period (Present, Half-day, Absent, OT) with adjustment requests for drivers and off-site field staff.',
   },
   {
     icon: <Icons.HeartPulse />,
@@ -145,13 +145,13 @@ const WORKFLOW_STEPS = [
   },
   {
     number: '02',
-    title: 'Sync Attendance & Review Run',
-    description: 'The engine pulls DTR records, applies overtime multipliers and statutory tables, and produces an itemized draft for HR verification.',
+    title: 'Record Cut-off Attendance & Review Run',
+    description: 'HR records attendance per cut-off period (1st–15th / 16th–month end), with adjustment requests for off-site drivers and field staff, and the engine produces an itemized draft for verification.',
   },
   {
     number: '03',
-    title: 'Approve, Disburse & Distribute',
-    description: 'Sign off with immutable audit logs, generate disbursement reports, and release secure, PIN-protected PDF payslips to employees.',
+    title: 'Submit for External Finance Processing',
+    description: 'Sign off with immutable audit logs and submit the computed payroll to the Finance module, which handles approval, disbursement and payslip release to employees.',
   },
 ];
 
@@ -164,8 +164,8 @@ const STATUTORY_ITEMS = [
 ];
 
 const SECURITY_ITEMS = [
-  { label: 'Role-Based Access Control', detail: 'Granular permissions segregating Admin, HR, Finance and Employee views.' },
-  { label: 'PIN-Protected Payslips', detail: 'Digital payslips require individual employee verification before sensitive salary data is revealed.' },
+  { label: 'Two User Types Only', detail: 'HR Admin manages the full payroll process; employees get a limited self-service portal — a smaller attack surface with no Finance role inside the system.' },
+  { label: 'Admin-Only Password Resets', detail: 'No self-service forgot password. Forgotten passwords are reset manually by the system administrator or designated IT personnel.' },
   { label: 'Immutable Audit Trails', detail: 'All compensation adjustments, claim decisions, and approval milestones are timestamped.' },
   { label: 'Enterprise Session Guard', detail: 'Secure cryptographic tokens with idle timeout protection and automated session revocation.' },
 ];
@@ -176,8 +176,8 @@ const FAQS = [
     answer: 'The system has statutory contribution tables for SSS, PhilHealth, and Pag-IBIG built directly into the calculation engine. When payroll is processed, gross earnings are evaluated against the current brackets to deduct employee and employer shares with zero manual formulas.',
   },
   {
-    question: 'How do employees access and download their payslips?',
-    answer: 'Employees log in to their self-service portal to view recent and historical payslips. To protect salary confidentiality, payslips feature an optional personal PIN gate and can be exported as official PDF documents.',
+    question: 'How do employees access their payslips?',
+    answer: 'Payslips are generated and released through the Finance system — the Payroll & Benefits System computes salaries and provides employees a payroll summary with the salary bracket and rate basis for every SSS, PhilHealth and Pag-IBIG deduction.',
   },
   {
     question: 'Can HR track and review employee benefit claims with receipts?',
@@ -231,8 +231,8 @@ export default function Landing() {
           </nav>
 
           <div className="lp-nav-actions">
-            <Link to="/login" className="lp-btn lp-btn-primary">
-              Sign In
+            <Link to="/about" className="lp-btn lp-btn-outline">
+              About Us
             </Link>
           </div>
 
@@ -257,8 +257,8 @@ export default function Landing() {
                 <a href="#faq" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
               </nav>
               <div className="lp-mobile-actions">
-                <Link to="/login" className="lp-btn lp-btn-primary lp-btn-full" onClick={() => setMobileMenuOpen(false)}>
-                  Sign In
+                <Link to="/about" className="lp-btn lp-btn-outline lp-btn-full" onClick={() => setMobileMenuOpen(false)}>
+                  About Us
                 </Link>
               </div>
             </div>
@@ -276,19 +276,23 @@ export default function Landing() {
 
           <p className="lp-hero-text">
             Run compliant payroll cycles, automate SSS, PhilHealth, Pag-IBIG and BIR computations,
-            track daily attendance, and manage HMO medical benefits — all inside one unified, auditable workspace.
+            track cut-off attendance, and manage HMO medical benefits — all inside one unified, auditable workspace.
           </p>
 
           <div className="lp-hero-cta">
-            <Link to="/register" className="lp-btn lp-btn-primary lp-btn-xl">
-              <span>Get Started</span>
+            <Link to="/login?as=hr" className="lp-btn lp-btn-primary lp-btn-xl">
+              <span>HR Admin Portal</span>
               <Icons.ArrowRight />
             </Link>
-            <Link to="/login" className="lp-btn lp-btn-outline lp-btn-xl">
-              <Icons.Lock />
-              <span>Sign In to Workspace</span>
+            <Link to="/login?as=employee" className="lp-btn lp-btn-outline lp-btn-xl">
+              <span>Employee Portal</span>
+              <Icons.ArrowRight />
             </Link>
           </div>
+          <p className="lp-hero-cta-note">
+            One login page, two dashboards — the system routes you by role. Employees and HR Admins can{' '}
+            <Link to="/register">register</Link> with the company registration code.
+          </p>
 
           <div className="lp-hero-trust">
             <div className="lp-trust-item">
@@ -301,7 +305,7 @@ export default function Landing() {
             </div>
             <div className="lp-trust-item">
               <span className="lp-trust-icon"><Icons.Check /></span>
-              <span>PIN-protected payslips</span>
+              <span>Employee self-service portal</span>
             </div>
             <div className="lp-trust-item">
               <span className="lp-trust-icon"><Icons.Check /></span>
@@ -339,7 +343,7 @@ export default function Landing() {
       <section id="workflow" className="lp-workflow-section">
         <div className="lp-container">
           <div className="lp-section-header">
-            <h2 className="lp-section-title">From timesheets to disbursed payslips in three steps</h2>
+            <h2 className="lp-section-title">From cut-off attendance to submitted payroll in three steps</h2>
             <p className="lp-section-subtitle">
               Designed for speed without compromising compliance or financial auditing controls.
             </p>
@@ -452,12 +456,12 @@ export default function Landing() {
             </p>
           </div>
           <div className="lp-cta-buttons">
-            <Link to="/register" className="lp-btn lp-btn-white lp-btn-xl">
-              <span>Create Account</span>
+            <Link to="/login?as=hr" className="lp-btn lp-btn-white lp-btn-xl">
+              <span>HR Admin Portal</span>
               <Icons.ArrowRight />
             </Link>
-            <Link to="/login" className="lp-btn lp-btn-transparent lp-btn-xl">
-              <span>Sign In to Workspace</span>
+            <Link to="/login?as=employee" className="lp-btn lp-btn-transparent lp-btn-xl">
+              <span>Employee Portal</span>
             </Link>
           </div>
         </div>
@@ -505,8 +509,9 @@ export default function Landing() {
           <div className="lp-footer-col">
             <h4 className="lp-footer-head">Access &amp; Legal</h4>
             <ul className="lp-footer-links">
-              <li><Link to="/login">Sign In</Link></li>
-              <li><Link to="/register">Create Account</Link></li>
+              <li><Link to="/login?as=hr">HR Admin Portal</Link></li>
+              <li><Link to="/login?as=employee">Employee Portal</Link></li>
+              <li><Link to="/register">Create HR Account</Link></li>
               <li><Link to="/terms">Terms of Service</Link></li>
               <li><a href="#faq">Support FAQ</a></li>
             </ul>

@@ -167,7 +167,7 @@ export function Modal({ open, onClose, title, children, wide }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 12, width: '100%', maxWidth: wide ? 720 : 480, boxShadow: '0 20px 60px rgba(17,24,39,.25)' }}
+        style={{ background: 'var(--surface)', borderRadius: 12, width: '100%', maxWidth: wide ? 720 : 480, boxShadow: '0 20px 60px rgba(17,24,39,.25)' }}
       >
         <div className="card-header">
           <h2>{title}</h2>

@@ -46,35 +46,6 @@ async function request(method, path, body) {
   return payload;
 }
 
-/** Fetches a binary resource (e.g. a payslip PDF) with the auth header, returning an object URL. */
-async function fetchObjectUrl(path) {
-  const headers = { Accept: 'application/pdf' };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${BASE}${path}`, { headers });
-  if (!response.ok) {
-    throw new ApiError(`Request failed (${response.status})`, response.status);
-  }
-  const blob = await response.blob();
-  return URL.createObjectURL(blob);
-}
-
-/** POSTs a JSON body (e.g. a password) and reads back a binary PDF as an object URL. */
-async function postObjectUrl(path, body) {
-  const headers = { Accept: 'application/pdf', 'Content-Type': 'application/json' };
-  const token = getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
-  if (!response.ok) {
-    const text = await response.text();
-    let message = `Request failed (${response.status})`;
-    try { message = JSON.parse(text)?.error || message; } catch { /* non-JSON error body */ }
-    throw new ApiError(message, response.status);
-  }
-  const blob = await response.blob();
-  return URL.createObjectURL(blob);
-}
-
 export const qs = (params = {}) => {
   const entries = Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined);
   return entries.length ? `?${new URLSearchParams(entries).toString()}` : '';
@@ -106,11 +77,8 @@ export const api = {
   put: (path, body) => request('PUT', path, body ?? {}),
   patch: (path, body) => request('PATCH', path, body ?? {}),
   del: (path) => request('DELETE', path),
-  objectUrl: (path) => fetchObjectUrl(path),
-  postObjectUrl: (path, body) => postObjectUrl(path, body),
   login: (email, password) => request('POST', '/api/auth/login', { email, password }),
   register: (payload) => request('POST', '/api/auth/register', payload),
   supabaseLogin,
-  resetPassword: (accessToken, password) => request('POST', '/api/auth/reset-password', { access_token: accessToken, password }),
   health: () => request('GET', '/api/health'),
 };
