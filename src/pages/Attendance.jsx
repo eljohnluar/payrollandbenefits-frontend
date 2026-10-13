@@ -204,6 +204,7 @@ function AdjustmentsTab() {
 function LeaveTab({ year }) {
   const { data: balances, loading: bLoading, error: bError } = useResource(`/api/leave/balances${qs({ year })}`);
   const { data: requests, loading: rLoading, error: rError } = useResource(`/api/leave/requests${qs({ year })}`);
+  const [sub, setSub] = useState('balances');
 
   const balRows = balances || [];
   const reqRows = requests || [];
@@ -220,7 +221,14 @@ function LeaveTab({ year }) {
         <Stat label="Leave Requests" value={reqRows.length} kind="neutral" />
       </StatsGrid>
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
+      <div className="filters-bar">
+        <span className="seg" style={{ display: 'inline-flex', gap: 6 }}>
+          <button className={`btn small${sub === 'balances' ? '' : ' ghost'}`} onClick={() => setSub('balances')}>Leave Balances</button>
+          <button className={`btn small${sub === 'requests' ? '' : ' ghost'}`} onClick={() => setSub('requests')}>Leave Requests</button>
+        </span>
+      </div>
+
+      {sub === 'balances' ? (
         <Card title={`Leave Balances (${year})`} body>
           <DataTable
             loading={bLoading} error={bError}
@@ -240,6 +248,7 @@ function LeaveTab({ year }) {
             rows={balRows} empty="No leave balance records found."
           />
         </Card>
+      ) : (
         <Card title={`Leave Requests (${year})`} body>
           <DataTable
             loading={rLoading} error={rError}
@@ -254,7 +263,7 @@ function LeaveTab({ year }) {
             rows={reqRows} empty="No leave requests for this year."
           />
         </Card>
-      </div>
+      )}
     </>
   );
 }

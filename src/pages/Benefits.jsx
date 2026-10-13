@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useResource } from '../hooks/useResource.js';
 import { api, qs } from '../api/client.js';
-import { PageHeader, StatsGrid, Stat, Card, DataTable, Field, Badge, Modal, Notice, money } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, DataTable, Field, Badge, Modal, Notice, money } from '../components/ui.jsx';
 import { shortDate } from '../lib/format.js';
 
 const mutedSmall = { fontSize: 11, color: 'var(--text-muted)' };
@@ -12,6 +12,14 @@ const LEAVE_TYPES = ['Vacation Leave', 'Sick Leave', 'Service Incentive Leave'];
 // fall back to 100 - employer_share like my_benefits.php does.
 const eePct = (r) => (r.employee_share != null ? Number(r.employee_share) : 100 - Number(r.employer_share || 0));
 const erPct = (r) => Number(r.employer_share || 0);
+
+const BENEFIT_SECTIONS = [
+  { id: 'enrollments', label: 'Enrollment Records' },
+  { id: 'sil', label: 'Mandatory Service Incentive Leave (SIL)' },
+  { id: 'requests', label: 'Leave Requests' },
+];
+
+const benefitAbbr = (label) => label.replace(/[^A-Za-z ]/g, '').split(' ').filter((w) => /[A-Za-z]/.test(w[0] || '')).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
 export default function Benefits() {
   // Only HR Admin reaches this page now.
@@ -31,6 +39,8 @@ export default function Benefits() {
   );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
+  const [section, setSection] = useState('enrollments');
+  const [collapsed, setCollapsed] = useState(false);
 
   // employee_id -> department, so the table can show the muted second line like the PHP page.
   const deptById = useMemo(() => {
@@ -161,66 +171,102 @@ export default function Benefits() {
         <Stat label="Total Monthly Premium" value={<span style={{ color: 'var(--primary)' }}>{money(stats.premium)}</span>} />
       </StatsGrid>
 
-      <div className="filters-bar">
-        <select className="form-control" value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}>
-          <option value="">All Employees</option>
-          {(employees || []).map((emp) => (
-            <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} ({emp.code})</option>
+      <div className={`settings-split ep-split${collapsed ? ' ep-collapsed' : ''}`}>
+        <div className="settings-modal-small">
+          <div className="settings-modal-head ep-head">
+            <span className="ep-head-title">Sections</span>
+            <button
+              type="button"
+              className="ep-collapse-btn"
+              title={collapsed ? 'Expand navigation' : 'Shrink to sidebar'}
+              onClick={() => setCollapsed((c) => !c)}
+            >
+              {collapsed ? '»' : '«'}
+            </button>
+          </div>
+          {BENEFIT_SECTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              title={s.label}
+              className={`settings-nav-item${s.id === section ? ' active' : ''}`}
+              onClick={() => setSection(s.id)}
+            >
+              <span className="ep-nav-abbr">{benefitAbbr(s.label)}</span>
+              <span className="ep-nav-label">{s.label}</span>
+            </button>
           ))}
-        </select>
+        </div>
+
+        <div className="settings-modal-large">
+          <div className="settings-modal-head ep-head">
+            <span className="ep-head-title">{BENEFIT_SECTIONS.find((s) => s.id === section).label}</span>
+            <span className="ep-modal-right">
+              {section === 'sil' && <button className="btn btn-secondary btn-sm" onClick={() => setLeaveOpen(true)}>File Leave Request</button>}
+            </span>
+          </div>
+          <div className="settings-modal-body">
+            {section === 'enrollments' && (
+              <>
+                <div style={{ marginBottom: 12, maxWidth: 320 }}>
+                  <select className="form-control" value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}>
+                    <option value="">All Employees</option>
+                    {(employees || []).map((emp) => (
+                      <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} ({emp.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <DataTable
+                  loading={loading} error={error}
+                  columns={columns}
+                  rows={enrollments}
+                  empty="No enrollments yet."
+                />
+              </>
+            )}
+
+            {section === 'sil' && (
+              <DataTable
+                loading={silLoading}
+                columns={[
+                  { key: 'employee', label: 'Employee', render: (r) => (
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</div>
+                      <div style={mutedSmall}>{r.department}</div>
+                    </div>
+                  ) },
+                  { key: 'accrued', label: 'Accrued (days)', align: 'right' },
+                  { key: 'used', label: 'Used', align: 'right' },
+                  { key: 'balance', label: 'Balance', align: 'right', render: (r) => <span style={{ fontWeight: 700 }}>{r.balance} d</span> },
+                  { key: 'window', label: 'Use window', render: () => <span className="badge badge-info">April only</span> },
+                ]}
+                rows={(balances || []).filter((b) => b.leave_type === 'Service Incentive Leave')}
+                empty="No SIL balances for this year yet."
+              />
+            )}
+
+            {section === 'requests' && (
+              <DataTable
+                columns={[
+                  { key: 'employee', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</span> },
+                  { key: 'leave_type', label: 'Type' },
+                  { key: 'range', label: 'Start → End', render: (r) => `${r.start_date} → ${r.end_date}` },
+                  { key: 'days', label: 'Days', align: 'right' },
+                  { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
+                  { key: 'actions', label: '', align: 'right', render: (r) => r.status === 'Pending' && canDecideLeave && (
+                    <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <button className="btn btn-success btn-sm" onClick={() => decideLeave(r.id, 'Approved')}>Approve</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => decideLeave(r.id, 'Rejected')}>Reject</button>
+                    </span>
+                  ) },
+                ]}
+                rows={leaveRequests || []}
+                empty="No leave requests filed this year."
+              />
+            )}
+          </div>
+        </div>
       </div>
-
-      <Card title="Enrollment Records">
-        <DataTable
-          loading={loading} error={error}
-          columns={columns}
-          rows={enrollments}
-          empty="No enrollments yet."
-        />
-      </Card>
-
-      <Card
-        title="Mandatory Service Incentive Leave (SIL)"
-        right={<button className="btn btn-secondary btn-sm" onClick={() => setLeaveOpen(true)}>File Leave Request</button>}
-      >
-        <DataTable
-          loading={silLoading}
-          columns={[
-            { key: 'employee', label: 'Employee', render: (r) => (
-              <div>
-                <div style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</div>
-                <div style={mutedSmall}>{r.department}</div>
-              </div>
-            ) },
-            { key: 'accrued', label: 'Accrued (days)', align: 'right' },
-            { key: 'used', label: 'Used', align: 'right' },
-            { key: 'balance', label: 'Balance', align: 'right', render: (r) => <span style={{ fontWeight: 700 }}>{r.balance} d</span> },
-            { key: 'window', label: 'Use window', render: () => <span className="badge badge-info">April only</span> },
-          ]}
-          rows={(balances || []).filter((b) => b.leave_type === 'Service Incentive Leave')}
-          empty="No SIL balances for this year yet."
-        />
-      </Card>
-
-      <Card title="Leave Requests">
-        <DataTable
-          columns={[
-            { key: 'employee', label: 'Employee', render: (r) => <span style={{ fontWeight: 600 }}>{r.first_name} {r.last_name}</span> },
-            { key: 'leave_type', label: 'Type' },
-            { key: 'range', label: 'Start → End', render: (r) => `${r.start_date} → ${r.end_date}` },
-            { key: 'days', label: 'Days', align: 'right' },
-            { key: 'status', label: 'Status', render: (r) => <Badge>{r.status}</Badge> },
-            { key: 'actions', label: '', align: 'right', render: (r) => r.status === 'Pending' && canDecideLeave && (
-              <span style={{ display: 'inline-flex', gap: 6 }}>
-                <button className="btn btn-success btn-sm" onClick={() => decideLeave(r.id, 'Approved')}>Approve</button>
-                <button className="btn btn-danger btn-sm" onClick={() => decideLeave(r.id, 'Rejected')}>Reject</button>
-              </span>
-            ) },
-          ]}
-          rows={leaveRequests || []}
-          empty="No leave requests filed this year."
-        />
-      </Card>
 
       <Modal open={leaveOpen} onClose={() => setLeaveOpen(false)} title="File Leave Request">
         <form onSubmit={fileLeave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

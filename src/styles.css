@@ -524,7 +524,7 @@ tfoot td { padding: 11px 14px; font-weight: 600; background: var(--surface-alt);
 @media (prefers-reduced-motion: reduce) { .skel::after { animation: none; } }
 
 /* ── Employee portal: task bar, cut-off attendance, payroll summary ── */
-.taskbar-wrap { margin: 4px 0 14px; }
+.taskbar-wrap { position: relative; margin: 4px 0 14px; }
 .taskbar { width: 100%; font-size: 15px; padding: 12px 14px; border-radius: var(--radius-lg); border: 1.5px solid var(--border); }
 .taskbar:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
 .taskbar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px; }
@@ -602,6 +602,20 @@ input.cutoff-input { width: 84px; padding: 6px 8px; font-size: 13px; }
 .settings-nav-item:hover { color: var(--text-main); background: var(--surface-alt); }
 .settings-nav-item.active { color: var(--primary); background: var(--primary-light); font-weight: 700; }
 .settings-modal-body { padding: 16px 18px; }
+
+/* Employee profile two-modal view: shrinkable section nav */
+.ep-split { transition: grid-template-columns .15s ease; }
+.ep-split.ep-collapsed { grid-template-columns: 58px 1fr; }
+.ep-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ep-collapse-btn { background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); cursor: pointer; font-size: 13px; line-height: 1; padding: 3px 8px; }
+.ep-collapse-btn:hover { color: var(--primary); border-color: var(--primary); }
+.ep-split.ep-collapsed .ep-head { justify-content: center; }
+.ep-split.ep-collapsed .ep-head-title { display: none; }
+.ep-nav-abbr { display: none; font-weight: 700; font-size: 11px; }
+.ep-split.ep-collapsed .settings-nav-item { text-align: center; padding: 11px 0; }
+.ep-split.ep-collapsed .ep-nav-label { display: none; }
+.ep-split.ep-collapsed .ep-nav-abbr { display: inline; }
+.ep-modal-right { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; font-size: 12px; }
 .settings-row { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .settings-row:last-of-type { border-bottom: none; }
 .settings-row-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
@@ -672,7 +686,7 @@ input.cutoff-input { width: 84px; padding: 6px 8px; font-size: 13px; }
 @media (max-width: 819px) { .topbar-id-name { display: none; } }
 
 /* Searchable task bar — live-filtered results under the search input */
-.taskbar-results { position: relative; z-index: 20; margin-top: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 8px 24px rgba(15, 23, 42, .12); overflow: hidden; }
+.taskbar-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; max-height: 320px; overflow-y: auto; z-index: 90; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgba(15, 23, 42, .18); }
 .taskbar-result { display: flex; align-items: center; gap: 10px; width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 11px 14px; font-size: 13.5px; font-weight: 600; color: var(--text-main); text-align: left; cursor: pointer; }
 .taskbar-result:last-child { border-bottom: none; }
 .taskbar-result:hover { background: var(--primary-light); color: var(--primary); }

@@ -26,6 +26,17 @@ const EMPTY_ALLOWANCE = { type: 'Rice', amount: '', frequency: 'Monthly', descri
 const EMPTY_LOAN = { loan_type: 'SSS Loan', principal: '', monthly_deduction: '', balance: '', approved_at: '', status: 'Active' };
 const EMPTY_INCENTIVE = { name: '', type: 'Performance', rate_type: 'Fixed', rate: '', frequency: 'Monthly', target: '', eligibility: '', effective_date: '', end_date: '', is_active: true };
 
+const COMP_SECTIONS = [
+  { id: 'structure', label: 'Salary Structure' },
+  { id: 'allowances', label: 'Allowances' },
+  { id: 'history', label: 'Salary History' },
+  { id: 'loans', label: 'Loans & Deductions' },
+  { id: 'incentives', label: 'Incentives' },
+  { id: 'earnings', label: 'Earned Incentives' },
+];
+
+const compAbbr = (label) => label.split(' ').filter((w) => /[A-Za-z]/.test(w[0] || '')).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+
 export default function Compensation() {
   const [params, setParams] = useSearchParams();
   const id = params.get('employee') || '';
@@ -38,6 +49,8 @@ export default function Compensation() {
   const [notice, setNotice] = useState({ kind: 'info', msg: '' });
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState('');
+  const [section, setSection] = useState('structure');
+  const [collapsed, setCollapsed] = useState(false);
 
   // Salary modal (existing POST /api/employees/{id}/salary flow, now modal-driven).
   const [salaryOpen, setSalaryOpen] = useState(false);
@@ -469,103 +482,107 @@ export default function Compensation() {
             </div>
           </div>
 
-          <div className="grid-2" style={{ alignItems: 'start' }}>
-            {/* LEFT: salary structure + history */}
-            <div>
-              <Card
-                title="Salary Structure"
-                right={<button type="button" className="btn btn-secondary btn-sm" onClick={openSalaryModal}>Edit Basic Salary</button>}
-                body
-              >
-                <div className="grid-2" style={{ gap: 14, marginBottom: 8 }}>
-                  <div>
-                    <div className="stat-label">Monthly Basic Salary</div>
-                    <div className="stat-value" style={{ fontSize: 22 }}>{money(basic)}</div>
-                  </div>
-                  <div>
-                    <div className="stat-label">Active Monthly Allowances</div>
-                    <div className="stat-value" style={{ fontSize: 20, color: 'var(--success)' }}>{money(activeMonthlyAllowances)}</div>
-                  </div>
-                  {rateRow(`Daily Rate (Est. /${workDays}d)`, money(dailyRate))}
-                  {rateRow(`Hourly Rate (Est. /${workHours}h)`, money(hourlyRate))}
-                </div>
-              </Card>
-
-              <Card title="Salary History">
-                <DataTable
-                  columns={salaryHistoryColumns}
-                  rows={profile.salary_history}
-                  loading={profileLoading}
-                  empty="No historical changes recorded."
-                />
-              </Card>
+          <div className={`settings-split ep-split${collapsed ? ' ep-collapsed' : ''}`}>
+            <div className="settings-modal-small">
+              <div className="settings-modal-head ep-head">
+                <span className="ep-head-title">Sections</span>
+                <button
+                  type="button"
+                  className="ep-collapse-btn"
+                  title={collapsed ? 'Expand navigation' : 'Shrink to sidebar'}
+                  onClick={() => setCollapsed((c) => !c)}
+                >
+                  {collapsed ? '»' : '«'}
+                </button>
+              </div>
+              {COMP_SECTIONS.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  title={s.label}
+                  className={`settings-nav-item${s.id === section ? ' active' : ''}`}
+                  onClick={() => setSection(s.id)}
+                >
+                  <span className="ep-nav-abbr">{compAbbr(s.label)}</span>
+                  <span className="ep-nav-label">{s.label}</span>
+                </button>
+              ))}
             </div>
 
-            {/* RIGHT: allowances + loans */}
-            <div>
-              <Card
-                title="Allowances"
-                right={<button type="button" className="btn btn-primary btn-sm" onClick={openAddAllowance}>+ Add Allowance</button>}
-              >
-                <DataTable
-                  columns={allowanceColumns}
-                  rows={allAllowances}
-                  loading={profileLoading}
-                  empty="No allowances assigned."
-                />
-              </Card>
-
-              <Card
-                title={
-                  <div>
-                    Loans & Deductions
-                    {totalLoansMonthly > 0 && (
-                      <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>
-                        Monthly deduction total: {money(totalLoansMonthly)}
-                      </span>
-                    )}
+            <div className="settings-modal-large">
+              <div className="settings-modal-head ep-head">
+                <span className="ep-head-title">{COMP_SECTIONS.find((s) => s.id === section).label}</span>
+                <span className="ep-modal-right">
+                  {section === 'structure' && <button type="button" className="btn btn-secondary btn-sm" onClick={openSalaryModal}>Edit Basic Salary</button>}
+                  {section === 'allowances' && <button type="button" className="btn btn-primary btn-sm" onClick={openAddAllowance}>+ Add Allowance</button>}
+                  {section === 'loans' && <button type="button" className="btn btn-primary btn-sm" onClick={openAddLoan}>+ Add Loan</button>}
+                  {section === 'incentives' && (
+                    <>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={openMetricModal}>Record Metric</button>
+                      <button type="button" className="btn btn-primary btn-sm" onClick={openAddIncentive}>+ Add Incentive</button>
+                    </>
+                  )}
+                </span>
+              </div>
+              <div className="settings-modal-body">
+                {section === 'structure' && (
+                  <div className="grid-2" style={{ gap: 14 }}>
+                    <div>
+                      <div className="stat-label">Monthly Basic Salary</div>
+                      <div className="stat-value" style={{ fontSize: 22 }}>{money(basic)}</div>
+                    </div>
+                    <div>
+                      <div className="stat-label">Active Monthly Allowances</div>
+                      <div className="stat-value" style={{ fontSize: 20, color: 'var(--success)' }}>{money(activeMonthlyAllowances)}</div>
+                    </div>
+                    {rateRow(`Daily Rate (Est. /${workDays}d)`, money(dailyRate))}
+                    {rateRow(`Hourly Rate (Est. /${workHours}h)`, money(hourlyRate))}
                   </div>
-                }
-                right={<button type="button" className="btn btn-primary btn-sm" onClick={openAddLoan}>+ Add Loan</button>}
-              >
-                <DataTable
-                  columns={loanColumns}
-                  rows={loans}
-                  loading={profileLoading}
-                  empty="No loans or recurring deductions active."
-                />
-              </Card>
+                )}
+
+                {section === 'allowances' && (
+                  <DataTable columns={allowanceColumns} rows={allAllowances} loading={profileLoading} empty="No allowances assigned." />
+                )}
+
+                {section === 'history' && (
+                  <DataTable columns={salaryHistoryColumns} rows={profile.salary_history} loading={profileLoading} empty="No historical changes recorded." />
+                )}
+
+                {section === 'loans' && (
+                  <>
+                    {totalLoansMonthly > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+                        Monthly deduction total: <strong style={{ color: 'var(--danger)' }}>{money(totalLoansMonthly)}</strong>
+                      </div>
+                    )}
+                    <DataTable columns={loanColumns} rows={loans} loading={profileLoading} empty="No loans or recurring deductions active." />
+                  </>
+                )}
+
+                {section === 'incentives' && (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+                      <input className="form-control" type="month" style={{ width: 170 }} value={computeMonth} onChange={(e) => setComputeMonth(e.target.value)} />
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={computeIncentives} disabled={busy}>Compute Period</button>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                        Auto-evaluates Performance, Attendance and Retention structures; record a metric for the rest.
+                      </span>
+                    </div>
+                    <DataTable columns={incentiveColumns} rows={inc.structures} empty="No incentive structures for this employee." />
+                  </>
+                )}
+
+                {section === 'earnings' && (
+                  <>
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 0 }}>
+                      Earned incentives are added to gross pay automatically in the next payroll run.
+                    </p>
+                    <DataTable columns={earningsColumns} rows={inc.earnings} empty="No incentives earned yet." />
+                  </>
+                )}
+              </div>
             </div>
           </div>
-
-          <Card
-            title={
-              <div>
-                Incentives
-                <div style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Earned incentives are added to gross pay automatically in the next payroll run
-                </div>
-              </div>
-            }
-            right={
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={openMetricModal}>Record Metric</button>
-                <button type="button" className="btn btn-primary btn-sm" onClick={openAddIncentive}>+ Add Incentive</button>
-              </div>
-            }
-          >
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
-              <input className="form-control" type="month" style={{ width: 170 }} value={computeMonth} onChange={(e) => setComputeMonth(e.target.value)} />
-              <button type="button" className="btn btn-secondary btn-sm" onClick={computeIncentives} disabled={busy}>Compute Period</button>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                Auto-evaluates Performance, Attendance and Retention structures; record a metric for the rest.
-              </span>
-            </div>
-            <DataTable columns={incentiveColumns} rows={inc.structures} empty="No incentive structures for this employee." />
-            <div style={{ height: 16 }} />
-            <h3 style={{ fontSize: 14, margin: '0 0 8px', color: 'var(--text-main)' }}>Earned Incentives</h3>
-            <DataTable columns={earningsColumns} rows={inc.earnings} empty="No incentives earned yet." />
-          </Card>
         </>
       )}
 
