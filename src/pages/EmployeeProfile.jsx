@@ -34,6 +34,25 @@ const SECTIONS = [
 
 const abbr = (label) => label.split(' ').filter((w) => /[A-Za-z]/.test(w[0] || '')).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
+// HR3 pushes ratings as combined "4.82 — Outstanding" text; legacy rows are plain "4.8".
+function parseRating(rating) {
+  if (rating === null || rating === undefined || rating === '') return { score: null, label: null };
+  const raw = String(rating);
+  const numMatch = raw.match(/\d+(\.\d+)?/);
+  const score = numMatch ? Number(numMatch[0]) : null;
+  const dash = raw.search(/—|–|-/);
+  const label = dash >= 0 ? raw.slice(dash + 1).trim() : (numMatch ? raw.replace(numMatch[0], '').trim() : raw.trim());
+  return { score: Number.isFinite(score) ? score : null, label: label || null };
+}
+
+function ratingBadgeClass(score) {
+  if (score === null) return 'badge-muted';
+  if (score >= 4.5) return 'badge-success';
+  if (score >= 3.5) return 'badge-info';
+  if (score >= 2.5) return 'badge-warning';
+  return 'badge-danger';
+}
+
 export default function EmployeeProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -64,7 +83,8 @@ export default function EmployeeProfile() {
   const requestCount = (leaveRequests || []).filter((r) => String(r.employee_id) === String(id)).length;
 
   const performance = emp.performance || [];
-  const latestRating = performance.length ? Number(performance[0].rating) : null;
+  const latestRating = performance.length ? parseRating(performance[0].rating) : { score: null, label: null };
+  const latestReviewDate = performance.length ? performance[0].review_date : null;
 
   const benefits = emp.benefits || [];
   const activeBenefits = benefits.filter((b) => b.status === 'Active').length;
@@ -126,10 +146,12 @@ export default function EmployeeProfile() {
         />
         <Stat
           label="Performance Rating"
-          value={Number.isFinite(latestRating) ? (
-            <span>{latestRating.toFixed(2)} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 5.0</span></span>
+          value={latestRating.score !== null ? (
+            <span>{latestRating.score.toFixed(2)} <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 5.0</span></span>
           ) : '—'}
-          sub="⭐ Latest KPI Evaluation"
+          sub={latestRating.score !== null
+            ? `${latestRating.label ? `${latestRating.label} · ` : ''}${latestReviewDate ? shortDate(latestReviewDate) : 'Latest review'}`
+            : 'No HR3 evaluation yet'}
           kind="positive"
         />
         <Stat
@@ -237,7 +259,15 @@ export default function EmployeeProfile() {
               <DataTable
                 columns={[
                   { key: 'review_date', label: 'Review Date', render: (r) => shortDate(r.review_date) },
-                  { key: 'rating', label: 'Rating', render: (r) => <span className="badge badge-success">⭐ {Number(r.rating || 0).toFixed(2)}</span> },
+                  { key: 'rating', label: 'Rating', render: (r) => {
+                    const { score, label } = parseRating(r.rating);
+                    if (score === null && !label) return '—';
+                    return (
+                      <span className={`badge ${ratingBadgeClass(score)}`}>
+                        ⭐ {score !== null ? `${score.toFixed(2)} / 5.0` : ''}{score !== null && label ? ` — ${label}` : (label || '')}
+                      </span>
+                    );
+                  } },
                   { key: 'bonus_amount', label: 'Performance Bonus', render: (r) => <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{money(r.bonus_amount)}</span> },
                 ]}
                 rows={performance}
