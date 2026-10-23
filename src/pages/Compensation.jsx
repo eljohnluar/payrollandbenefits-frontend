@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
-import { PageHeader, Card, DataTable, Badge, Notice, Modal, Field, money, statusBadge } from '../components/ui.jsx';
+import { PageHeader, Card, DataTable, Badge, Notice, Modal, Field, money, statusBadge, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
 import { shortDate } from '../lib/format.js';
 
 const ALLOWANCE_TYPES = ['Rice', 'Transport', 'Meal', 'Communication', 'Housing', 'Clothing', 'Position Allowance', 'Internet Allowance', 'Medical Allowance'];
@@ -437,6 +437,10 @@ export default function Compensation() {
           </div>
         }
       />
+      <IntegrationSourceBanner>
+        <IntegrationSourceTag systems={['HR1']} /> Basic salary and employee master are synced from <strong>HR1 (Core HR)</strong>.{' '}
+        <IntegrationSourceTag systems={['HR3']} style={{ marginLeft: 4 }} /> Performance ratings and recognition awards from <strong>HR3 (Performance & Development)</strong> inform incentive and bonus decisions here.
+      </IntegrationSourceBanner>
       <Notice kind={notice.kind}>{notice.msg}</Notice>
 
       {!id && (

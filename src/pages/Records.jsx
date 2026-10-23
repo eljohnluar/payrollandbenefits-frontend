@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
-import { PageHeader, Card, DataTable, Badge, StatsGrid, Stat, Notice } from '../components/ui.jsx';
+import { PageHeader, Card, DataTable, Badge, StatsGrid, Stat, Notice, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
 import { money, shortDate } from '../lib/format.js';
 
 const TABS = [
@@ -190,6 +190,9 @@ export default function Records() {
 
       {tab === 'analytics' && first && (
         <>
+          <IntegrationSourceBanner>
+            <IntegrationSourceTag systems={['HR3']} /> Headcount, performance scores, rating distributions, and promotion-readiness data are provided by <strong>HR3 (Performance & Development)</strong>.
+          </IntegrationSourceBanner>
           <StatsGrid>
             <Stat label="Employees" value={first.employees?.total ?? 0} sub={`${first.employees?.active ?? 0} active`} />
             <Stat label="Latest Run" value={money(first.latest_run?.total_net)} sub={`${first.latest_run?.period ?? '—'} · ${first.latest_run?.status ?? '—'}`} />

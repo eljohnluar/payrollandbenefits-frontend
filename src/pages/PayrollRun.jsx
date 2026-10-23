@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api/client.js';
 import { money, shortDate } from '../lib/format.js';
 import { useRealtime } from '../hooks/useRealtime.js';
-import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice, Modal, Field } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice, Modal, Field, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
 
 const RANGES = { '30d': '30 Days', '3m': '3 Months', '1y': '1 Year' };
 const RANGE_MODIFY = { '30d': -30, '3m': -3, '1y': -12 };
@@ -491,6 +491,12 @@ export default function PayrollRun() {
   return (
     <>
       <PageHeader title="Payroll Run" subtitle="Compute a period and submit it for external Finance approval — payslips and disbursement belong to Finance." right={run ? <Badge>{run.status}</Badge> : undefined} />
+
+      <IntegrationSourceBanner>
+        <IntegrationSourceTag systems={['HR1']} /> Employee & salary data from <strong>HR1</strong> ·{' '}
+        <IntegrationSourceTag systems={['HR2']} /> Attendance & leave from <strong>HR2</strong> ·{' '}
+        <IntegrationSourceTag systems={['HR3']} /> Performance ratings from <strong>HR3</strong> all feed into payroll computations. Payslips are served back to HR1 for employee self-service.
+      </IntegrationSourceBanner>
 
       {/* Range + run selector, mirroring the PHP page header */}
       <div className="page-header" style={{ alignItems: 'center', marginTop: -6, marginBottom: 18 }}>

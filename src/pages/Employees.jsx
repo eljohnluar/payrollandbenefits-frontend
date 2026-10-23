@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
-import { PageHeader, StatsGrid, Stat, DataTable, Card, Badge, Modal, Field, money } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, DataTable, Card, Badge, Modal, Field, money, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
 
 const DEPARTMENTS = ['IT Department', 'HR Department', 'Finance Department', 'Operations', 'Marketing'];
 const STATUSES = ['Active', 'On Leave', 'Resigned', 'Terminated'];
@@ -141,8 +141,13 @@ export default function Employees() {
     <>
       <PageHeader
         title="Employees"
-        subtitle="Employee records are managed in the Core HRMS module — this view is read-only."
+        subtitle="Employee records are pushed from the Core HR system — this view is read-only."
+        right={<IntegrationSourceTag systems={['HR1']} label="Synced from HR1 (Core HR)" />}
       />
+
+      <IntegrationSourceBanner>
+        <IntegrationSourceTag systems={['HR1']} /> Employee profiles, departments, positions, employment types, and salary data are pushed by <strong>HR1 (Core HR)</strong> into this system. Changes to employee records must be made in HR1.
+      </IntegrationSourceBanner>
 
       <StatsGrid>
         <Stat label="Total Employees" value={stats.total} />

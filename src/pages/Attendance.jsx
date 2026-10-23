@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useResource } from '../hooks/useResource.js';
 import { api, qs } from '../api/client.js';
-import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -284,6 +284,10 @@ export default function Attendance() {
   return (
     <>
       <PageHeader title="Attendance" subtitle="Recorded per cut-off period (1st–15th / 16th–month end) — the basis for payroll computation." />
+
+      <IntegrationSourceBanner>
+        <IntegrationSourceTag systems={['HR2']} /> Daily attendance logs and approved leave requests are pushed by <strong>HR2 (Time & Attendance)</strong>. This data feeds directly into payroll computations — days worked, overtime pay, tardiness deductions, and unpaid leave.
+      </IntegrationSourceBanner>
 
       <div className="info-banner">
         <span>ℹ</span>

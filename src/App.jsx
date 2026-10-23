@@ -18,7 +18,6 @@ import BenefitPlans from './pages/BenefitPlans.jsx';
 import ThirteenthMonth from './pages/ThirteenthMonth.jsx';
 import Settings from './pages/Settings.jsx';
 import Records from './pages/Records.jsx';
-import Integrations from './pages/Integrations.jsx';
 import Profile from './pages/Profile.jsx';
 import AuditLog from './pages/AuditLog.jsx';
 import Archive from './pages/Archive.jsx';
@@ -82,7 +81,6 @@ export default function App() {
           <Route path="thirteenth-month" element={<ThirteenthMonth />} />
           <Route path="settings" element={<Settings />} />
           <Route path="records" element={<Records />} />
-          <Route path="integrations" element={<Integrations />} />
           <Route path="profile" element={<Profile />} />
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="archive" element={<Archive />} />

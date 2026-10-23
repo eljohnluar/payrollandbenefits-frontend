@@ -187,3 +187,45 @@ export function Field({ label, children }) {
     </div>
   );
 }
+
+const HR_SOURCE_COLORS = {
+  HR1: { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8', dot: '#2563eb' },
+  HR2: { bg: '#ecfeff', border: '#a5f3fc', text: '#0e7490', dot: '#0891b2' },
+  HR3: { bg: '#f5f3ff', border: '#ddd6fe', text: '#6d28d9', dot: '#7c3aed' },
+};
+
+export function IntegrationSourceTag({ systems, label }) {
+  // systems: array like ['HR1'] or ['HR2', 'HR3']
+  // label: optional override text
+  if (!systems || !systems.length) return null;
+  const colors = systems.length === 1 ? HR_SOURCE_COLORS[systems[0]] : { bg: '#f8fafc', border: '#e2e8f0', text: '#475569', dot: '#94a3b8' };
+  const text = label || (systems.length === 1 ? `Synced from ${systems[0]}` : `Data from ${systems.join(' · ')}`);
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text,
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+      letterSpacing: 0.2,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.dot, display: 'inline-block' }} />
+      {text}
+    </span>
+  );
+}
+
+export function IntegrationSourceBanner({ children }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      background: 'var(--surface-alt, #f8fafc)', border: '1px solid var(--border)',
+      borderRadius: 8, padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)',
+      marginBottom: 16,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1, opacity: 0.6 }}>
+        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+      </svg>
+      <span>{children}</span>
+    </div>
+  );
+}
+
