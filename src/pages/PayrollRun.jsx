@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, qs } from '../api/client.js';
 import { money, shortDate } from '../lib/format.js';
 import { useRealtime } from '../hooks/useRealtime.js';
-import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice, Modal, Field, IntegrationSourceTag, IntegrationSourceBanner } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, Badge, ErrorBox, Notice, Modal, Field, IntegrationSourceTag, IntegrationSourceBanner, TablePagination } from '../components/ui.jsx';
 
 const RANGES = { '30d': '30 Days', '3m': '3 Months', '1y': '1 Year' };
 const RANGE_MODIFY = { '30d': -30, '3m': -3, '1y': -12 };
@@ -318,6 +318,8 @@ export default function PayrollRun() {
   const [payDate, setPayDate] = useState('');
   const [expanded, setExpanded] = useState({});
   const [showImport, setShowImport] = useState(false);
+  const [itemsPage, setItemsPage] = useState(1);
+  const [glPage, setGlPage] = useState(1);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
@@ -348,6 +350,8 @@ export default function PayrollRun() {
       setRunId(r.id);
       setPayDate(r.pay_date || offSunday(r.period_end));
       setExpanded({});
+      setItemsPage(1);
+      setGlPage(1);
     } catch (e) {
       setError(e.message);
     }
@@ -625,7 +629,7 @@ export default function PayrollRun() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => (
+                  {(items.length > 10 ? items.slice((Math.min(Math.max(1, itemsPage), Math.max(1, Math.ceil(items.length / 10))) - 1) * 10, Math.min(Math.max(1, itemsPage), Math.max(1, Math.ceil(items.length / 10))) * 10) : items).map((item) => (
                     <FragmentRow
                       key={item.id}
                       item={item}
@@ -654,6 +658,12 @@ export default function PayrollRun() {
                 </tfoot>
               </table>
             </div>
+            <TablePagination
+              page={Math.min(Math.max(1, itemsPage), Math.max(1, Math.ceil(items.length / 10)))}
+              totalItems={items.length}
+              pageSize={10}
+              onPageChange={setItemsPage}
+            />
           </div>
 
           {/* Automated outputs banner */}
@@ -692,7 +702,7 @@ export default function PayrollRun() {
                     </tr>
                   </thead>
                   <tbody>
-                    {run.gl_entries.map((g) => (
+                    {(run.gl_entries.length > 10 ? run.gl_entries.slice((Math.min(Math.max(1, glPage), Math.max(1, Math.ceil(run.gl_entries.length / 10))) - 1) * 10, Math.min(Math.max(1, glPage), Math.max(1, Math.ceil(run.gl_entries.length / 10))) * 10) : run.gl_entries).map((g) => (
                       <tr key={g.id}>
                         <td style={muted}>{shortDate(g.entry_date)}</td>
                         <td style={semibold}>{g.account_code} {g.account_name}</td>
@@ -715,6 +725,12 @@ export default function PayrollRun() {
                   </tfoot>
                 </table>
               </div>
+              <TablePagination
+                page={Math.min(Math.max(1, glPage), Math.max(1, Math.ceil(run.gl_entries.length / 10)))}
+                totalItems={run.gl_entries.length}
+                pageSize={10}
+                onPageChange={setGlPage}
+              />
             </div>
           )}
 

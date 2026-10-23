@@ -101,6 +101,95 @@ tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: va
 tbody tr:hover { background: var(--surface-alt); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Table pagination */
+.data-table-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  gap: 12px;
+  font-size: 13px;
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+  flex-wrap: wrap;
+}
+.table-pagination-info {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.table-pagination-info strong {
+  color: var(--text-main);
+}
+.table-pagination-page-count {
+  color: var(--text-muted);
+}
+.table-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.table-pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pagination-page-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pagination-page-btn:hover:not(:disabled):not(.active) {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+.pagination-page-btn.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.pagination-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.pagination-ellipsis {
+  padding: 0 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  user-select: none;
+}
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.card-body > .data-table-container > .table-pagination,
+.card-body > .table-pagination {
+  padding-left: 0;
+  padding-right: 0;
+  background: transparent;
+}
+
 .badge { display: inline-flex; padding: 2px 8px; font-size: 11px; font-weight: 600; border-radius: 20px; background: var(--surface-alt); color: var(--text-muted); }
 .badge.ok { background: #dcfce7; color: var(--success); }
 .badge.warn { background: #fef3c7; color: #b45309; }
@@ -351,6 +440,10 @@ tfoot td { padding: 11px 14px; font-weight: 600; background: var(--surface-alt);
 
   .table-wrap { -webkit-overflow-scrolling: touch; }
   .table-wrap table { font-size: 12.5px; }
+
+  .table-pagination { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 12px; }
+  .table-pagination-info { text-align: center; }
+  .table-pagination-controls { justify-content: space-between; width: 100%; }
 
   .notif-dropdown { position: fixed; right: 10px; top: 52px; width: min(300px, calc(100vw - 20px)); max-height: 55vh; overflow: hidden; display: flex; flex-direction: column; }
   .notif-list { max-height: none; flex: 1; }

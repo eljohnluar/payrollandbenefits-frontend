@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client.js';
-import { PageHeader, Card, Notice } from '../components/ui.jsx';
+import { PageHeader, Card, Notice, TablePagination } from '../components/ui.jsx';
 
 const SYSTEM_COLOR = { HR1: '#2563eb', HR2: '#0891b2', HR3: '#7c3aed' };
 
@@ -30,6 +30,13 @@ function StatusPill({ keys }) {
 
 function PartnerCard({ partner }) {
   const accent = SYSTEM_COLOR[partner.system] || '#334155';
+  const [keysPage, setKeysPage] = useState(1);
+  const [epPage, setEpPage] = useState(1);
+  const keys = partner.keys || [];
+  const endpoints = partner.endpoints || [];
+  const pagedKeys = keys.length > 10 ? keys.slice((Math.min(Math.max(1, keysPage), Math.max(1, Math.ceil(keys.length / 10))) - 1) * 10, Math.min(Math.max(1, keysPage), Math.max(1, Math.ceil(keys.length / 10))) * 10) : keys;
+  const pagedEndpoints = endpoints.length > 10 ? endpoints.slice((Math.min(Math.max(1, epPage), Math.max(1, Math.ceil(endpoints.length / 10))) - 1) * 10, Math.min(Math.max(1, epPage), Math.max(1, Math.ceil(endpoints.length / 10))) * 10) : endpoints;
+
   return (
     <div className="card" style={{ borderTop: `3px solid ${accent}` }}>
       <div className="card-header" style={{ alignItems: 'flex-start' }}>
@@ -59,30 +66,38 @@ function PartnerCard({ partner }) {
         </div>
 
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>API keys</div>
-        {(partner.keys || []).length === 0 ? (
+        {keys.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>No keys issued yet.</div>
         ) : (
-          <table style={{ width: '100%', fontSize: 13, marginBottom: 14 }}>
-            <tbody>
-              {partner.keys.map((k) => (
-                <tr key={k.name}>
-                  <td style={{ fontWeight: 600 }}>{k.name}</td>
-                  <td style={{ color: 'var(--muted)' }}>{k.scopes}</td>
-                  <td>
-                    <span className={`badge ${k.is_active ? 'badge-success' : 'badge-muted'}`}>{k.is_active ? 'Active' : 'Revoked'}</span>
-                  </td>
-                  <td style={{ color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{k.last_used_at ? `Used ${fmtDateTime(k.last_used_at)}` : 'Never used'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <>
+            <table style={{ width: '100%', fontSize: 13, marginBottom: 14 }}>
+              <tbody>
+                {pagedKeys.map((k) => (
+                  <tr key={k.name}>
+                    <td style={{ fontWeight: 600 }}>{k.name}</td>
+                    <td style={{ color: 'var(--muted)' }}>{k.scopes}</td>
+                    <td>
+                      <span className={`badge ${k.is_active ? 'badge-success' : 'badge-muted'}`}>{k.is_active ? 'Active' : 'Revoked'}</span>
+                    </td>
+                    <td style={{ color: 'var(--muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{k.last_used_at ? `Used ${fmtDateTime(k.last_used_at)}` : 'Never used'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <TablePagination
+              page={Math.min(Math.max(1, keysPage), Math.max(1, Math.ceil(keys.length / 10)))}
+              totalItems={keys.length}
+              pageSize={10}
+              onPageChange={setKeysPage}
+            />
+          </>
         )}
 
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 6 }}>Endpoints</div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: 13 }}>
             <tbody>
-              {(partner.endpoints || []).map((e) => (
+              {pagedEndpoints.map((e) => (
                 <tr key={e.path}>
                   <td style={{ width: 56 }}>
                     <span className={`badge ${e.method === 'GET' ? 'badge-info' : 'badge-muted'}`}>{e.method}</span>
@@ -94,6 +109,12 @@ function PartnerCard({ partner }) {
               ))}
             </tbody>
           </table>
+          <TablePagination
+            page={Math.min(Math.max(1, epPage), Math.max(1, Math.ceil(endpoints.length / 10)))}
+            totalItems={endpoints.length}
+            pageSize={10}
+            onPageChange={setEpPage}
+          />
         </div>
       </div>
     </div>

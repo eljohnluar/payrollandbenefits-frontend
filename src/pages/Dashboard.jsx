@@ -4,7 +4,7 @@ import { api } from '../api/client.js';
 import { money } from '../lib/format.js';
 import { useRealtime } from '../hooks/useRealtime.js';
 import { useResource } from '../hooks/useResource.js';
-import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Loading } from '../components/ui.jsx';
+import { PageHeader, StatsGrid, Stat, Card, DataTable, Badge, statusBadge, ErrorBox, Loading, TablePagination } from '../components/ui.jsx';
 
 const shortDate = (v) => (v ? new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 
@@ -152,6 +152,8 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(null);
   const { data: inc } = useResource('/api/incentives/summary');
   const [error, setError] = useState('');
+  const [paPage, setPaPage] = useState(1);
+  const [topPage, setTopPage] = useState(1);
 
   const load = useCallback(() => {
     api.get('/api/dashboard/summary').then(setSummary).catch((e) => setError(e.message));
@@ -225,7 +227,10 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {summary.pending_approvals.map((pa) => (
+                    {(summary.pending_approvals.length > 10
+                      ? summary.pending_approvals.slice((Math.min(Math.max(1, paPage), Math.max(1, Math.ceil(summary.pending_approvals.length / 10))) - 1) * 10, Math.min(Math.max(1, paPage), Math.max(1, Math.ceil(summary.pending_approvals.length / 10))) * 10)
+                      : summary.pending_approvals
+                    ).map((pa) => (
                       <tr key={pa.payroll_run_id}>
                         <td>
                           <div style={{ fontWeight: 600 }}>{pa.period}</div>
@@ -247,6 +252,12 @@ export default function Dashboard() {
                   </tbody>
                 </table>
               </div>
+              <TablePagination
+                page={Math.min(Math.max(1, paPage), Math.max(1, Math.ceil(summary.pending_approvals.length / 10)))}
+                totalItems={summary.pending_approvals.length}
+                pageSize={10}
+                onPageChange={setPaPage}
+              />
             </Card>
           )}
 
@@ -333,7 +344,10 @@ export default function Dashboard() {
                     <tr><th>Employee</th><th style={{ textAlign: 'right' }}>YTD Incentives</th></tr>
                   </thead>
                   <tbody>
-                    {(inc.top_earners || []).map((t) => (
+                    {((inc.top_earners || []).length > 10
+                      ? (inc.top_earners || []).slice((Math.min(Math.max(1, topPage), Math.max(1, Math.ceil((inc.top_earners || []).length / 10))) - 1) * 10, Math.min(Math.max(1, topPage), Math.max(1, Math.ceil((inc.top_earners || []).length / 10))) * 10)
+                      : (inc.top_earners || [])
+                    ).map((t) => (
                       <tr key={t.employee_id}>
                         <td style={{ fontWeight: 600 }}>{t.name}</td>
                         <td style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 600 }}>{money(t.total)}</td>
@@ -342,6 +356,12 @@ export default function Dashboard() {
                     {!inc.top_earners?.length && <tr><td colSpan={2} style={{ color: 'var(--text-muted)' }}>No incentives recorded yet.</td></tr>}
                   </tbody>
                 </table>
+                <TablePagination
+                  page={Math.min(Math.max(1, topPage), Math.max(1, Math.ceil((inc.top_earners || []).length / 10)))}
+                  totalItems={(inc.top_earners || []).length}
+                  pageSize={10}
+                  onPageChange={setTopPage}
+                />
                 <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
                   Monthly trend: {(inc.monthly_trend || []).slice(0, 3).map((m) => `${m.period} ${money(m.total)}`).join('  ·  ') || '—'}
                 </div>

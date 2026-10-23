@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useResource } from '../hooks/useResource.js';
 import { api } from '../api/client.js';
-import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money } from '../components/ui.jsx';
+import { PageHeader, Card, Badge, Notice, ErrorBox, Loading, money, TablePagination } from '../components/ui.jsx';
 
 const STATUSES = ['Pending', 'Approved', 'Rejected', 'Paid'];
 
@@ -82,6 +82,20 @@ export default function Claims() {
     }
   }
 
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const totalClaims = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalClaims / pageSize));
+  const validPage = Math.min(Math.max(1, page), totalPages);
+
+  useEffect(() => {
+    setPage(1);
+  }, [status, totalClaims]);
+
+  const pagedRows = totalClaims > pageSize
+    ? rows.slice((validPage - 1) * pageSize, validPage * pageSize)
+    : rows;
+
   return (
     <>
       <PageHeader title="Claims Management" subtitle="Employees file reimbursement claims from their portal; review and process them here." />
@@ -95,27 +109,35 @@ export default function Claims() {
       <div className="claims-grid">
         <Card title="Claims">
           {loading ? <Loading /> : error ? <ErrorBox error={error} /> : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Employee</th><th>Category</th><th>Amount</th><th>Receipt Date</th><th>Status</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {rows.length ? rows.map((c) => (
-                    <tr key={c.id} style={selectedId === c.id ? { background: 'var(--primary-light)' } : undefined}>
-                      <td style={{ fontWeight: 600 }}>{c.employee_name}</td>
-                      <td>{c.category}</td>
-                      <td>{money(c.amount)}</td>
-                      <td>{c.claim_date}</td>
-                      <td><Badge>{c.status}</Badge></td>
-                      <td>
-                        <button className="btn btn-secondary btn-sm" onClick={() => setSelectedId(c.id)}>View</button>
-                      </td>
-                    </tr>
-                  )) : <tr><td colSpan={6} className="empty-state">No claims found.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Employee</th><th>Category</th><th>Amount</th><th>Receipt Date</th><th>Status</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {pagedRows.length ? pagedRows.map((c) => (
+                      <tr key={c.id} style={selectedId === c.id ? { background: 'var(--primary-light)' } : undefined}>
+                        <td style={{ fontWeight: 600 }}>{c.employee_name}</td>
+                        <td>{c.category}</td>
+                        <td>{money(c.amount)}</td>
+                        <td>{c.claim_date}</td>
+                        <td><Badge>{c.status}</Badge></td>
+                        <td>
+                          <button className="btn btn-secondary btn-sm" onClick={() => setSelectedId(c.id)}>View</button>
+                        </td>
+                      </tr>
+                    )) : <tr><td colSpan={6} className="empty-state">No claims found.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <TablePagination
+                page={validPage}
+                totalItems={totalClaims}
+                pageSize={pageSize}
+                onPageChange={setPage}
+              />
+            </>
           )}
         </Card>
         <Card title="Claim Detail" body>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { money } from '../lib/format.js';
 
 export { money };
@@ -85,7 +85,140 @@ export function Notice({ children, kind = 'info' }) {
   return <div className={`alert ${kind}`}>{children}</div>;
 }
 
-export function DataTable({ columns, rows, loading, error, empty = 'No records yet.', foot }) {
+export function TablePagination({
+  page = 1,
+  totalItems = 0,
+  pageSize = 10,
+  onPageChange,
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  if (totalItems <= pageSize) return null;
+
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+
+  const pages = [];
+  const maxButtons = 5;
+  if (totalPages <= maxButtons) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    let startPage = Math.max(1, page - 1);
+    let endPage = Math.min(totalPages, page + 1);
+
+    if (page <= 2) {
+      startPage = 1;
+      endPage = 3;
+    } else if (page >= totalPages - 1) {
+      startPage = totalPages - 2;
+      endPage = totalPages;
+    }
+
+    if (startPage > 1) {
+      pages.push(1);
+      if (startPage > 2) pages.push('ellipsis-start');
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) pages.push('ellipsis-end');
+      pages.push(totalPages);
+    }
+  }
+
+  return (
+    <div className="table-pagination">
+      <div className="table-pagination-info">
+        Showing <strong>{start}–{end}</strong> of <strong>{totalItems}</strong> entries
+        <span className="table-pagination-page-count"> · Page <strong>{page}</strong> of <strong>{totalPages}</strong></span>
+      </div>
+      <div className="table-pagination-controls">
+        <button
+          type="button"
+          className="btn btn-sm btn-secondary pagination-btn pagination-prev-btn"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          aria-label="Previous page"
+        >
+          ‹ Previous
+        </button>
+        <div className="table-pagination-pages">
+          {pages.map((p, idx) => {
+            if (typeof p === 'string') {
+              return <span key={`ellipsis-${idx}`} className="pagination-ellipsis">…</span>;
+            }
+            return (
+              <button
+                key={p}
+                type="button"
+                className={`pagination-page-btn ${page === p ? 'active' : ''}`}
+                onClick={() => onPageChange(p)}
+                aria-current={page === p ? 'page' : undefined}
+                aria-label={`Page ${p}`}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          className="btn btn-sm btn-primary pagination-btn pagination-next-btn"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+          aria-label="Next page"
+        >
+          Next Page ›
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function DataTable({
+  columns,
+  rows,
+  loading,
+  error,
+  empty = 'No records yet.',
+  foot,
+  pageSize = 10,
+  page: controlledPage,
+  onPageChange: controlledOnPageChange,
+}) {
+  const [internalPage, setInternalPage] = useState(1);
+  const isControlled = controlledPage !== undefined;
+  const page = isControlled ? controlledPage : internalPage;
+  const setPage = isControlled ? (controlledOnPageChange || (() => {})) : setInternalPage;
+
+  const totalRows = rows ? rows.length : 0;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const validPage = Math.min(Math.max(1, page), totalPages);
+
+  // Sync internal page if totalPages shrinks below current page
+  useEffect(() => {
+    if (!isControlled && page > totalPages) {
+      setInternalPage(totalPages);
+    }
+  }, [isControlled, page, totalPages]);
+
+  // Reset to first page when total count changes
+  const prevCountRef = useRef(totalRows);
+  useEffect(() => {
+    if (prevCountRef.current !== totalRows) {
+      prevCountRef.current = totalRows;
+      if (!isControlled) {
+        setInternalPage(1);
+      }
+    }
+  }, [totalRows, isControlled]);
+
+  const pagedRows = totalRows > pageSize
+    ? rows.slice((validPage - 1) * pageSize, validPage * pageSize)
+    : (rows || []);
+
   const head = (
     <thead>
       <tr>
@@ -117,36 +250,44 @@ export function DataTable({ columns, rows, loading, error, empty = 'No records y
   }
   if (error) return <ErrorBox error={error} />;
   return (
-    <div className="table-wrap">
-      <table>
-        {head}
-        <tbody>
-          {rows && rows.length > 0 ? (
-            rows.map((row, i) => (
-              <tr key={row.id ?? i}>
-                {columns.map((c) => (
-                  <td key={c.key} className={c.align === 'right' ? 'num' : undefined}>
-                    {c.render ? c.render(row) : row[c.key] ?? '—'}
-                  </td>
+    <div className="data-table-container">
+      <div className="table-wrap">
+        <table>
+          {head}
+          <tbody>
+            {pagedRows && pagedRows.length > 0 ? (
+              pagedRows.map((row, i) => (
+                <tr key={row.id ?? (validPage - 1) * pageSize + i}>
+                  {columns.map((c) => (
+                    <td key={c.key} className={c.align === 'right' ? 'num' : undefined}>
+                      {c.render ? c.render(row) : row[c.key] ?? '—'}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={columns.length}>{empty}</td>
+              </tr>
+            )}
+          </tbody>
+          {foot && rows && rows.length > 0 && (
+            <tfoot>
+              <tr>
+                {foot.map((cell, i) => (
+                  <td key={i} className={columns[i]?.align === 'right' ? 'num' : undefined}>{cell}</td>
                 ))}
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={columns.length}>{empty}</td>
-            </tr>
+            </tfoot>
           )}
-        </tbody>
-        {foot && rows && rows.length > 0 && (
-          <tfoot>
-            <tr>
-              {foot.map((cell, i) => (
-                <td key={i} className={columns[i]?.align === 'right' ? 'num' : undefined}>{cell}</td>
-              ))}
-            </tr>
-          </tfoot>
-        )}
-      </table>
+        </table>
+      </div>
+      <TablePagination
+        page={validPage}
+        totalItems={totalRows}
+        pageSize={pageSize}
+        onPageChange={setPage}
+      />
     </div>
   );
 }
